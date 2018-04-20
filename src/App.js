@@ -38,8 +38,8 @@ class App extends Component {
           </a>
         </h2>
 
-
         <div className="HourSlider">
+          Hour
           <Slider min={0} max={84} marks={marks} step={null} onChange={this.onChange} defaultValue={0} />
         </div>
 
