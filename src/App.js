@@ -47,6 +47,7 @@ class App extends Component {
           {moment().add(this.state.hour + 1, 'hours').format('dddd, hA')}
         </h1>
 
+        <WeatherImage model={Models.MSnow} region={this.state.region} hour={this.state.hour}/>
         <WeatherImage model={Models.Precip} region={this.state.region} hour={this.state.hour}/>
         <WeatherImage model={Models.RainAndSnow} region={this.state.region} hour={this.state.hour}/>
       </div>

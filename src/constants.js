@@ -10,5 +10,6 @@ export const Regions = {
 export const Models = {
     Precip: 'pcp',
     RainAndSnow: 'rsnow',
-    Snow: 'snow'
+    Snow: 'snow',
+    MSnow: 'msnow'
 };
