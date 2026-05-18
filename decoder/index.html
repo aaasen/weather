@@ -168,7 +168,7 @@
 
   <textarea
     id="input"
-    placeholder="Paste inReach message — D1:G45NW 30% wc61 fz5500 sn3 7:5S 5:15S 45:13S …"
+    placeholder="Paste inReach message — D0518:30% wc61 fz5500 sn3 cm50 7:5S 5:15S 45:13S …"
     autocorrect="off"
     autocapitalize="off"
     spellcheck="false"
@@ -254,25 +254,27 @@
       return { style: `background:${b.bg};color:${b.fg}`, html };
     }
 
+    // Parse MMDD string into a Date object (current year, adjusted if in the past)
+    function parseDayKey(mmdd) {
+      const mm = parseInt(mmdd.slice(0, 2)) - 1;
+      const dd = parseInt(mmdd.slice(2, 4));
+      const now = new Date();
+      const d = new Date(now.getFullYear(), mm, dd);
+      return d;
+    }
+
+    function dayLabel(date) {
+      const weekdays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      return `${weekdays[date.getDay()]}<br><span style="font-weight:400;opacity:.7">${date.getMonth()+1}/${date.getDate()}</span>`;
+    }
+
     function parse(text) {
       const days = [];
-      const re = /D(\d+):(.*?)(?=\s+D\d+:|$)/g;
+      const re = /D(\d{4}):(.*?)(?=\s+D\d{4}:|$)/g;
       let m;
       while ((m = re.exec(text)) !== null) {
+        const mmdd    = m[1];
         const content = m[2].trim();
-        if (!content) continue;
-
-        // Gust + direction: new format starts with G{n}{dir}, old format has speed first then G{n}
-        const newFmt  = content.match(/^G(\d+)(NE|NW|SE|SW|N|E|S|W)?/);
-        const oldWind = content.match(/^(\d+)(NE|NW|SE|SW|N|E|S|W)?/);
-        const midGust = content.match(/\bG(\d+)\b/);
-
-        const gust = newFmt  ? parseInt(newFmt[1])
-                   : midGust ? parseInt(midGust[1])
-                   : 0;
-        const dir  = newFmt  ? (newFmt[2]  || '')
-                   : oldWind ? (oldWind[2] || '')
-                   : '';
 
         // Precip
         const precipM = content.match(/\b(\d+)%/);
@@ -304,9 +306,7 @@
         }
 
         days.push({
-          n:      parseInt(m[1]),
-          gust,
-          dir,
+          date:   parseDayKey(mmdd),
           precip: precipM ? parseInt(precipM[1]) : 0,
           wc:     wcM     ? parseInt(wcM[1])      : 0,
           fz_ft,
@@ -348,9 +348,6 @@
         `<span class="wx-icon">${wmoIcon(d.wc)}</span>
          <div class="wx-short">${wmoShort(d.wc)}</div>`
       );
-
-      // Gust row — Beaufort color, speed + direction only
-      const gustCells = days.map(d => windCell(d.gust, d.dir, true));
 
       // Cloud cover row
       const cloudCells = days.map(d =>
@@ -397,14 +394,13 @@
         ${row('450<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~20k ft</span>', alt450)}
       ` : '';
 
-      const th = `<th class="lbl"></th>${days.map(d => `<th class="day-h">D${d.n}</th>`).join('')}`;
+      const th = `<th class="lbl"></th>${days.map(d => `<th class="day-h">${dayLabel(d.date)}</th>`).join('')}`;
 
       return `<div class="table-wrap"><table>
         <thead><tr>${th}</tr></thead>
         <tbody>
           ${row('', iconCells)}
           ${sectionRow('Surface')}
-          ${row('Gust', gustCells)}
           ${row('Cloud mid', cloudCells)}
           ${row('Precip', precipCells)}
           ${row('Snow', snowCells)}

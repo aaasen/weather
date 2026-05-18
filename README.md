@@ -2,6 +2,11 @@
 
 Denali weather forecasts via InReach.
 
+## TODO
+
+ - Forecast types
+ - Model selection
+
 ## Forecasts
 
 There are three forecast types which correspond to the three type of check in messages:
