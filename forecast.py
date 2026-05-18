@@ -115,13 +115,15 @@ def _hour_rows(model_key: str, n_days: int, target_hours: list[int]) -> list[dic
 # ── Row → period converters ───────────────────────────────────────────────────
 
 
-def _to_full(r: dict) -> PeriodFull:
+def _to_full(r: dict, daily: bool = True) -> PeriodFull:
     fz_m = r.get("freezing_level_m") or 0
+    snow_cm = r.get("snow_cm") or 0
+    snow_in = round(snow_cm / 2.54) if daily else round(snow_cm / 0.254)
     return PeriodFull(
         weathercode=int(r.get("weathercode") or 0),
         precip=int(r.get("precip") or 0),
         freeze_ft=round(fz_m * 3.28084 / 1000) * 1000,
-        snow_in=round(r.get("snow_cm", 0) / 2.54),
+        snow_in=min(snow_in, 15),
         cloud_mid=int(r.get("cloudcover_mid") or 0),
         wind_700_mph=_round5(r.get("wind_speed_700hPa")),
         wind_700_dir=_deg_to_dir_idx(r.get("wind_direction_700hPa")),
@@ -133,14 +135,14 @@ def _to_full(r: dict) -> PeriodFull:
 
 
 def _make_message(
-    ft: ForecastType, rows_per_model: list[list[dict]], is_sub: bool
+    ft: ForecastType, rows_per_model: list[list[dict]], daily: bool
 ) -> str:
     start = datetime.date.fromisoformat(rows_per_model[0][0]["time"][:10])
     return ForecastMessage(
         type=int(ft),
         month=start.month,
         day=start.day,
-        periods=[[_to_full(r) for r in rows] for rows in rows_per_model],
+        periods=[[_to_full(r, daily=daily) for r in rows] for rows in rows_per_model],
     ).encode()
 
 
@@ -153,7 +155,7 @@ def fetch_type0() -> str:
     return _make_message(
         ForecastType.DAY10_DAILY_2M,
         [_noon_rows(m, 10) for m in models],
-        is_sub=False,
+        daily=True,
     )
 
 
@@ -163,7 +165,7 @@ def fetch_type1() -> str:
     return _make_message(
         ForecastType.DAY5_DAILY_3M,
         [_noon_rows(m, 5) for m in models],
-        is_sub=False,
+        daily=True,
     )
 
 
@@ -173,7 +175,7 @@ def fetch_type2() -> str:
     return _make_message(
         ForecastType.DAY1_HOURLY_1M,
         [_hour_rows(models[0], 1, list(range(20)))],
-        is_sub=False,
+        daily=False,
     )
 
 
@@ -183,7 +185,7 @@ def fetch_type3() -> str:
     return _make_message(
         ForecastType.DAY5_6H_1M,
         [_hour_rows(models[0], 5, [0, 6, 12, 18])],
-        is_sub=False,
+        daily=False,
     )
 
 
@@ -193,7 +195,7 @@ def fetch_type4() -> str:
     return _make_message(
         ForecastType.DAY5_12H_2M,
         [_hour_rows(m, 5, [0, 12]) for m in models],
-        is_sub=False,
+        daily=False,
     )
 
 
