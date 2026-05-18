@@ -14,6 +14,7 @@ _SURFACE_VARS = [
     "weathercode",
     "cloudcover_mid",
     "freezing_level_height",
+    "snowfall",
 ]
 _PRESSURE_LEVELS = [500, 450, 700]
 _PRESSURE_VAR_NAMES = ["temperature", "wind_speed", "wind_direction"]
@@ -57,6 +58,13 @@ def fetch_noon_data() -> tuple[list[dict], list[str]]:
     h = data["hourly"]
     times = h["time"]
 
+    # Sum daily snowfall (cm) across all hours for each calendar date
+    snow_arr = h.get("snowfall", [])
+    daily_snow: dict[str, float] = {}
+    for i, t in enumerate(times):
+        date = t[:10]
+        daily_snow[date] = daily_snow.get(date, 0.0) + (snow_arr[i] or 0.0)
+
     rows = []
     for i, t in enumerate(times):
         if not t.endswith("T12:00"):
@@ -73,6 +81,7 @@ def fetch_noon_data() -> tuple[list[dict], list[str]]:
             "cloudcover_mid": h["cloudcover_mid"][i],
             "freezing_level_m": fz_m,
             "freezing_level_km": round(fz_m / 1000, 1) if fz_m else None,
+            "snow_cm": round(daily_snow.get(t[:10], 0.0), 1),
             **{f"{var}_{lvl}hPa": h[f"{var}_{lvl}hPa"][i]
                for var in _PRESSURE_VAR_NAMES for lvl in _PRESSURE_LEVELS},
         })
@@ -86,22 +95,23 @@ def fetch_forecast() -> str:
     rows, _ = fetch_noon_data()
     parts = []
     for r in rows:
-        ws = _round5(r["wind_speed"])
         gust = _round5(r["gust"])
         card = _deg_to_cardinal(r["wind_dir"])
         precip = _round10(r["precip"])
         wc = r["weathercode"] or 0
-        fz_km = r["freezing_level_km"]
+        fz_m = r["freezing_level_m"]
+        fz_ft = round((fz_m or 0) * 3.28084 / 100) * 100
+        snow_in = round(r.get("snow_cm", 0) / 2.54)
 
-        entry = f"D{r['day']}:{ws}{card}"
-        if gust and gust != ws:
-            entry += f" G{gust}"
+        entry = f"D{r['day']}:G{gust}{card}"
         if precip:
             entry += f" {precip}%"
         if wc:
             entry += f" wc{int(wc)}"
-        if fz_km:
-            entry += f" fz{fz_km}k"
+        if fz_ft:
+            entry += f" fz{fz_ft}"
+        if snow_in:
+            entry += f" sn{snow_in}"
 
         # Altitude winds: 700 hPa (~10k ft), 500 hPa (~18k ft), 450 hPa (~20k ft / summit)
         for lvl, key in [(700, "7"), (500, "5"), (450, "45")]:
@@ -125,7 +135,8 @@ if __name__ == "__main__":
         print(f"  Precip:  {r['precip']}%")
         print(f"  WxCode:  {int(r['weathercode'])}")
         print(f"  Cloud mid: {r['cloudcover_mid']}%")
-        print(f"  Freeze:  {r['freezing_level_m']} m  ({r['freezing_level_km']} km)")
+        print(f"  Freeze:  {r['freezing_level_m']} m  ({r['freezing_level_km']} km)  ({round((r['freezing_level_m'] or 0) * 3.28084)} ft)")
+        print(f"  Snow:    {r['snow_cm']} cm  ({round(r['snow_cm'] / 2.54, 1)} in)")
         for lvl in _PRESSURE_LEVELS:
             t = r.get(f"temperature_{lvl}hPa")
             ws = r.get(f"wind_speed_{lvl}hPa")

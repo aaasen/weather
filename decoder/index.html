@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Denali WX</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#f5f5f5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #f5f5f5;
+      color: #1a1a1a;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.4;
+      padding: 14px;
+      min-height: 100dvh;
+    }
+
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #999;
+    }
+    .subtitle { font-size: 0.68rem; color: #bbb; letter-spacing: 0.03em; }
+
+    textarea {
+      width: 100%;
+      background: #fff;
+      color: #1a1a1a;
+      border: 1px solid #d0d0d0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      resize: vertical;
+      min-height: 60px;
+      outline: none;
+      margin-bottom: 14px;
+      -webkit-appearance: none;
+    }
+    textarea::placeholder { color: #bbb; }
+    textarea:focus { border-color: #999; }
+
+    .table-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      background: #fff;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    th, td {
+      padding: 7px 8px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    th.lbl, td.lbl {
+      text-align: left;
+      position: sticky;
+      left: 0;
+      background: #fafafa;
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #aaa;
+      white-space: nowrap;
+      width: 52px;
+      min-width: 52px;
+      border-right: 1px solid #ebebeb;
+      z-index: 1;
+      line-height: 1.3;
+    }
+
+    thead tr { border-bottom: 2px solid #e8e8e8; }
+    th.day-h {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #555;
+      letter-spacing: 0.04em;
+      min-width: 72px;
+    }
+
+    tbody tr:not(.section-head) { border-bottom: 1px solid #f0f0f0; }
+    tbody tr:nth-child(even) td:not(.lbl) { background: #fafafa; }
+    tbody tr:nth-child(even) td.lbl      { background: #f4f4f4; }
+
+    tr.section-head td {
+      background: #f0f0f0 !important;
+      font-size: 0.6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #999;
+      padding: 4px 8px;
+      border-top: 1px solid #e0e0e0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    tr.section-head td.lbl { background: #e8e8e8 !important; }
+
+    /* Weather icon row */
+    .wx-icon  { font-size: 1.6rem; line-height: 1; display: block; }
+    .wx-short { font-size: 0.67rem; color: #666; margin-top: 3px; line-height: 1.2; }
+
+    /* Beaufort colored wind cell */
+    .bft-mph { font-family: monospace; font-size: 0.82rem; font-weight: 600; }
+
+    /* Precip */
+    .precip-pct {
+      font-family: monospace;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .precip-bar {
+      height: 3px;
+      border-radius: 2px;
+      margin-top: 3px;
+      background: #e8e8e8;
+      overflow: hidden;
+    }
+    .precip-fill { height: 100%; border-radius: 2px; }
+
+    /* Snow */
+    .snow-val { font-family: monospace; font-size: 0.85rem; font-weight: 600; color: #5590cc; }
+    .snow-unit { font-size: 0.68rem; color: #aaa; }
+
+    /* Freeze */
+    .fz-val { font-family: monospace; font-size: 0.85rem; font-weight: 600; }
+
+    /* Altitude wind */
+    .wind-cell { font-family: monospace; font-size: 0.82rem; white-space: nowrap; }
+    .wind-spd   { font-weight: 600; }
+    .wind-dir   { color: #888; font-size: 0.75rem; }
+    .wind-arrow { color: #555; }
+
+    .nil { color: #ccc; font-size: 0.75rem; }
+
+    .empty {
+      color: #bbb;
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 32px 0;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Denali WX</h1>
+    <span class="subtitle">inReach decoder · 63.07°N 151.01°W</span>
+  </header>
+
+  <textarea
+    id="input"
+    placeholder="Paste inReach message — D1:G45NW 30% wc61 fz5500 sn3 7:5S 5:15S 45:13S …"
+    autocorrect="off"
+    autocapitalize="off"
+    spellcheck="false"
+  ></textarea>
+
+  <div id="output"></div>
+
+  <script>
+    // WMO code → [full label, short label, emoji]
+    const WMO = {
+      0:  ['Clear sky',            'Clear',          '☀️'],
+      1:  ['Mainly clear',         'Mainly clear',   '🌤️'],
+      2:  ['Partly cloudy',        'Partly cloudy',  '⛅'],
+      3:  ['Overcast',             'Overcast',       '☁️'],
+      45: ['Fog',                  'Fog',            '🌫️'],
+      48: ['Rime fog',             'Rime fog',       '🌫️'],
+      51: ['Light drizzle',        'Lt drizzle',     '🌦️'],
+      53: ['Moderate drizzle',     'Drizzle',        '🌦️'],
+      55: ['Dense drizzle',        'Dense drizzle',  '🌦️'],
+      56: ['Lt freezing drizzle',  'Frz drizzle',    '🌨️'],
+      57: ['Hvy freezing drizzle', 'Frz drizzle',    '🌨️'],
+      61: ['Slight rain',          'Light rain',     '🌧️'],
+      63: ['Moderate rain',        'Rain',           '🌧️'],
+      65: ['Heavy rain',           'Heavy rain',     '🌧️'],
+      66: ['Lt freezing rain',     'Frz rain',       '🌨️'],
+      67: ['Hvy freezing rain',    'Frz rain',       '🌨️'],
+      71: ['Slight snow',          'Light snow',     '❄️'],
+      73: ['Moderate snow',        'Snow',           '❄️'],
+      75: ['Heavy snow',           'Heavy snow',     '❄️'],
+      77: ['Snow grains',          'Snow grains',    '🌨️'],
+      80: ['Slight showers',       'Showers',        '🌧️'],
+      81: ['Moderate showers',     'Showers',        '🌧️'],
+      82: ['Violent showers',      'Hvy showers',    '🌧️'],
+      85: ['Slight snow showers',  'Snow showers',   '🌨️'],
+      86: ['Heavy snow showers',   'Snow showers',   '🌨️'],
+      95: ['Thunderstorm',         'Thunder',        '⛈️'],
+      96: ['Thunder + hail',       'Thunder/hail',   '⛈️'],
+      99: ['Thunder + hail',       'Thunder/hail',   '⛈️'],
+    };
+
+    const ARROWS = { N:'↑', NE:'↗', E:'→', SE:'↘', S:'↓', SW:'↙', W:'←', NW:'↖' };
+
+    // Beaufort: [mph upper bound, label, bg color, fg color]
+    const BEAUFORT = [
+      [1,        'Calm',         '#7e97a0', '#fff'],
+      [4,        'Light air',    '#7e97a0', '#fff'],
+      [8,        'Lt breeze',    '#82c8ec', '#1a1a1a'],
+      [13,       'Gentle',       '#3a9ecc', '#fff'],
+      [19,       'Moderate',     '#3a9e88', '#fff'],
+      [25,       'Fresh',        '#4a9e30', '#fff'],
+      [32,       'Strong',       '#d47810', '#fff'],
+      [39,       'Near gale',    '#9e2818', '#fff'],
+      [47,       'Gale',         '#dd0028', '#fff'],
+      [55,       'Strong gale',  '#8800aa', '#fff'],
+      [64,       'Storm',        '#5030b0', '#fff'],
+      [73,       'Violent storm','#006888', '#fff'],
+      [Infinity, 'Hurricane',    '#00cc44', '#fff'],
+    ];
+
+    function beaufort(mph) {
+      const i = BEAUFORT.findIndex(([t]) => mph < t);
+      return { n: i, name: BEAUFORT[i][1], bg: BEAUFORT[i][2], fg: BEAUFORT[i][3] };
+    }
+
+    function wmoIcon(c)  { return (WMO[c] || ['','','❓'])[2]; }
+    function wmoShort(c) { return (WMO[c] || ['',`wc${c}`,''])[1]; }
+
+    function precipColor(pct) {
+      if (pct >= 60) return '#c04040';
+      if (pct >= 30) return '#c08020';
+      return '#4080c8';
+    }
+
+    function windCell(ws, dir, colored = false) {
+      if (!ws && !dir) return '<span class="nil">—</span>';
+      const arrow = dir ? ARROWS[dir] || '' : '';
+      const html = `<div class="wind-cell">
+        <span class="bft-mph">${ws} mph</span>
+        ${dir ? `<span class="wind-dir"> ${dir} ${arrow}</span>` : ''}
+      </div>`;
+      if (!colored || !ws) return html;
+      const b = beaufort(ws);
+      return { style: `background:${b.bg};color:${b.fg}`, html };
+    }
+
+    function parse(text) {
+      const days = [];
+      const re = /D(\d+):(.*?)(?=\s+D\d+:|$)/g;
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        const content = m[2].trim();
+        if (!content) continue;
+
+        // Gust + direction: new format starts with G{n}{dir}, old format has speed first then G{n}
+        const newFmt  = content.match(/^G(\d+)(NE|NW|SE|SW|N|E|S|W)?/);
+        const oldWind = content.match(/^(\d+)(NE|NW|SE|SW|N|E|S|W)?/);
+        const midGust = content.match(/\bG(\d+)\b/);
+
+        const gust = newFmt  ? parseInt(newFmt[1])
+                   : midGust ? parseInt(midGust[1])
+                   : 0;
+        const dir  = newFmt  ? (newFmt[2]  || '')
+                   : oldWind ? (oldWind[2] || '')
+                   : '';
+
+        // Precip
+        const precipM = content.match(/\b(\d+)%/);
+
+        // WMO code
+        const wcM = content.match(/\bwc(\d+)\b/);
+
+        // Freezing level: new = fz{feet int}, old = fz{km}k
+        const fzM = content.match(/\bfz([\d.]+)(k)?/);
+        let fz_ft = null;
+        if (fzM) {
+          fz_ft = fzM[2] === 'k'
+            ? Math.round(parseFloat(fzM[1]) * 3280.84 / 100) * 100
+            : parseInt(fzM[1]);
+        }
+
+        // Snow accumulation (inches)
+        const snM = content.match(/\bsn(\d+)\b/);
+
+        // Altitude winds — match longest key first to avoid 5: matching inside 45:
+        const altRe = /\b(45|7|5):(\d+)(NE|NW|SE|SW|N|E|S|W)?/g;
+        const alts = {};
+        let am;
+        while ((am = altRe.exec(content)) !== null) {
+          alts[am[1]] = { ws: parseInt(am[2]), dir: am[3] || '' };
+        }
+
+        days.push({
+          n:      parseInt(m[1]),
+          gust,
+          dir,
+          precip: precipM ? parseInt(precipM[1]) : 0,
+          wc:     wcM     ? parseInt(wcM[1])      : 0,
+          fz_ft,
+          snow:   snM     ? parseInt(snM[1])      : 0,
+          p700:   alts['7']  || null,
+          p500:   alts['5']  || null,
+          p450:   alts['45'] || null,
+        });
+      }
+      return days;
+    }
+
+    function render(days) {
+      if (!days.length) return '<p class="empty">No D1: pattern found.</p>';
+
+      const hasAlt = days.some(d => d.p700 || d.p500 || d.p450);
+
+      // row() accepts string or {style, html} per cell
+      function row(label, cells, cls = '') {
+        const tds = cells.map(c => {
+          if (c && typeof c === 'object' && 'html' in c) {
+            return `<td style="${c.style || ''}">${c.html}</td>`;
+          }
+          return `<td>${c}</td>`;
+        }).join('');
+        return `<tr class="${cls}"><td class="lbl">${label}</td>${tds}</tr>`;
+      }
+
+      function sectionRow(label) {
+        return `<tr class="section-head">
+          <td class="lbl">${label}</td>
+          ${days.map(() => '<td></td>').join('')}
+        </tr>`;
+      }
+
+      // Icon row
+      const iconCells = days.map(d =>
+        `<span class="wx-icon">${wmoIcon(d.wc)}</span>
+         <div class="wx-short">${wmoShort(d.wc)}</div>`
+      );
+
+      // Gust row — Beaufort color, speed + direction only
+      const gustCells = days.map(d => windCell(d.gust, d.dir, true));
+
+      // Precip row
+      const precipCells = days.map(d => {
+        const c = precipColor(d.precip);
+        return `<div class="precip-pct" style="color:${c}">${d.precip}%</div>
+                <div class="precip-bar">
+                  <div class="precip-fill" style="width:${d.precip}%;background:${c}"></div>
+                </div>`;
+      });
+
+      // Snow row
+      const snowCells = days.map(d =>
+        d.snow
+          ? `<span class="snow-val">${d.snow}</span> <span class="snow-unit">in</span>`
+          : '<span class="nil">—</span>'
+      );
+
+      // Freeze row — feet only
+      const freezeCells = days.map(d =>
+        d.fz_ft != null
+          ? `<div class="fz-val">${d.fz_ft.toLocaleString()}</div>
+             <div class="snow-unit">ft</div>`
+          : '<span class="nil">—</span>'
+      );
+
+      // Altitude wind rows — Beaufort colored
+      const alt700 = days.map(d => d.p700 ? windCell(d.p700.ws, d.p700.dir, true) : '<span class="nil">—</span>');
+      const alt500 = days.map(d => d.p500 ? windCell(d.p500.ws, d.p500.dir, true) : '<span class="nil">—</span>');
+      const alt450 = days.map(d => d.p450 ? windCell(d.p450.ws, d.p450.dir, true) : '<span class="nil">—</span>');
+
+      const altRows = hasAlt ? `
+        ${sectionRow('Altitude')}
+        ${row('700<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~10k ft</span>', alt700)}
+        ${row('500<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~18k ft</span>', alt500)}
+        ${row('450<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~20k ft</span>', alt450)}
+      ` : '';
+
+      const th = `<th class="lbl"></th>${days.map(d => `<th class="day-h">D${d.n}</th>`).join('')}`;
+
+      return `<div class="table-wrap"><table>
+        <thead><tr>${th}</tr></thead>
+        <tbody>
+          ${row('', iconCells)}
+          ${sectionRow('Surface')}
+          ${row('Gust', gustCells)}
+          ${row('Precip', precipCells)}
+          ${row('Snow', snowCells)}
+          ${row('Freeze', freezeCells)}
+          ${altRows}
+        </tbody>
+      </table></div>`;
+    }
+
+    const input  = document.getElementById('input');
+    const output = document.getElementById('output');
+
+    input.addEventListener('input', () => {
+      const days = parse(input.value);
+      output.innerHTML = days.length
+        ? render(days)
+        : (input.value.trim() ? '<p class="empty">No D1: pattern found.</p>' : '');
+    });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
