@@ -11,19 +11,17 @@ Common header (12 bits):
   5  day    — 1-31
 
 Period types:
-  Full    (50 bits) — daily, primary model
-    5 wc  4 precip  8 freeze  5 snow  4 cloud  8 w700  8 w500  8 w600
-  Sub     (45 bits) — sub-daily, primary model (no snow)
-    5 wc  4 precip  8 freeze  4 cloud  8 w700  8 w500  8 w600
-  Compact (33 bits) — additional models
-    5 wc  4 precip  8 w700  8 w500  8 w600
+  Full (50 bits) — daily, all models
+    5 wc  4 precip  8 freeze  5 snow  4 cloud  8 w500  8 w600  8 w700
+  Sub  (45 bits) — sub-daily, all models (no snow)
+    5 wc  4 precip  8 freeze  4 cloud  8 w500  8 w600  8 w700
 
 Type layout (header + interleaved slots):
-  0 (10d-daily-2m):  12 + 10×(Full+Compact)         =  842 bits
-  1 (5d-daily-3m):   12 +  5×(Full+2×Compact)        =  592 bits
-  2 (1d-hourly-1m):  12 + 24×Sub                     = 1092 bits  ← max
-  3 (5d-6h-1m):      12 + 20×Sub                     =  912 bits
-  4 (5d-12h-2m):     12 + 10×(Sub+Compact)           =  792 bits
+  0 (10d-daily-2m):  12 + 10×2×Full         = 1012 bits
+  1 (5d-daily-3m):   12 +  5×3×Full         =  762 bits
+  2 (1d-hourly-1m):  12 + 24×Sub            = 1092 bits  ← max
+  3 (5d-6h-1m):      12 + 20×Sub            =  912 bits
+  4 (5d-12h-2m):     12 + 10×2×Sub          =  912 bits
 
 Models per type (fixed, primary first):
   0: ECMWF, GFS
@@ -362,11 +360,8 @@ class ForecastMessage:
     """
     Encodes any forecast type to 157 GSM chars.
 
-    periods[0]  = primary model list (PeriodFull or PeriodSub)
-    periods[1:] = additional model lists (PeriodCompact)
-
-    Within each time slot, primary comes first then compacts, so the
-    decoder can interleave models correctly.
+    All models use PeriodFull (daily types) or PeriodSub (sub-daily types).
+    Within each time slot, models are interleaved in TYPE_MODELS order.
     """
 
     type: int
@@ -409,18 +404,15 @@ class ForecastMessage:
                 ForecastType.DAY5_12H_2M: 10,
             }[ft]
 
-        n_extra = len(TYPE_MODELS[ft]) - 1
-        primary: list[Any] = []
-        extras: list[list[Any]] = [[] for _ in range(n_extra)]
+        n_models = len(TYPE_MODELS[ft])
+        all_periods: list[list[Any]] = [[] for _ in range(n_models)]
 
         for _ in range(n_periods):
-            p, pos = PrimaryClass.from_bits(b, pos)
-            primary.append(p)
-            for m in range(n_extra):
-                c, pos = PeriodCompact.from_bits(b, pos)
-                extras[m].append(c)
+            for m in range(n_models):
+                p, pos = PrimaryClass.from_bits(b, pos)
+                all_periods[m].append(p)
 
-        return ForecastMessage(type=t, month=month, day=day, periods=[primary] + extras)
+        return ForecastMessage(type=t, month=month, day=day, periods=all_periods)
 
     @property
     def forecast_type(self) -> ForecastType:

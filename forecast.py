@@ -54,6 +54,7 @@ def _fetch_hourly(model_key: str, n_days: int) -> tuple[dict, list[str]]:
     pressure_vars = [
         f"{v}_{l}hPa" for v in _PRESSURE_VAR_NAMES for l in _PRESSURE_LEVELS
     ]
+
     params = {
         "latitude": FORECAST_LAT,
         "longitude": FORECAST_LON,
@@ -66,12 +67,8 @@ def _fetch_hourly(model_key: str, n_days: int) -> tuple[dict, list[str]]:
     resp = requests.get(
         "https://api.open-meteo.com/v1/forecast", params=params, timeout=15
     )
-    print(resp.url)
     resp.raise_for_status()
     h = resp.json()["hourly"]
-    print(f"  {model_key} sample[0]: " + ", ".join(
-        f"{k}={v[0]}" for k, v in h.items() if k != "time"
-    ))
     return h, h["time"]
 
 
@@ -175,13 +172,11 @@ def _make_message(
 ) -> str:
     start = datetime.date.fromisoformat(rows_per_model[0][0]["time"][:10])
     converter = _to_sub if is_sub else _to_full
-    primary = [converter(r) for r in rows_per_model[0]]
-    extras = [[_to_compact(r) for r in rows] for rows in rows_per_model[1:]]
     return ForecastMessage(
         type=int(ft),
         month=start.month,
         day=start.day,
-        periods=[primary] + extras,
+        periods=[[converter(r) for r in rows] for rows in rows_per_model],
     ).encode()
 
 

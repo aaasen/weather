@@ -429,7 +429,6 @@
       const isFull    = TYPE_IS_FULL[t];
       const hasSnow   = TYPE_HAS_SNOW[t];
       const timeStep  = TYPE_TIME_STEP[t];
-      const nExtra    = models.length - 1;
       const decodePrimary = isFull ? decodeFullPeriod : decodeSubPeriod;
 
       const today = new Date();
@@ -442,23 +441,19 @@
         : new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0).getTime();
       const stepMs = timeStep * 3600000;
 
-      const primaryPeriods = [];
-      const extraPeriods   = Array.from({ length: nExtra }, () => []);
+      const allPeriods = Array.from({ length: models.length }, () => []);
 
       for (let i = 0; i < nPeriods; i++) {
         const date = new Date(baseMs + i * stepMs);
-        const p = decodePrimary(bits, pos);
-        pos = p.pos;
-        primaryPeriods.push({ ...p, date });
-        for (let m = 0; m < nExtra; m++) {
-          const c = decodeCompactPeriod(bits, pos);
-          pos = c.pos;
-          extraPeriods[m].push({ ...c, date });
+        for (let m = 0; m < models.length; m++) {
+          const p = decodePrimary(bits, pos);
+          pos = p.pos;
+          allPeriods[m].push({ ...p, date });
         }
       }
 
       return { type: t, label: TYPE_LABEL[t], models, hasSnow, timeStep,
-               periods: [primaryPeriods, ...extraPeriods] };
+               periods: allPeriods };
     }
 
     // ── Render helpers ────────────────────────────────────────────────────────
@@ -590,11 +585,15 @@
       body += altRows(primary);
       if (models.length > 1) body += sepRow();
 
-      // Additional model sections (compact: icon, precip, winds)
+      // Additional model sections
       extras.forEach((ps, mi) => {
         body += modelRow(models[mi + 1]);
         body += row('', iconCells(ps));
+        body += sectionRow('Surface');
+        body += row('Cloud mid', cloudCells(ps));
         body += row('Precip', precipCells(ps));
+        if (hasSnow) body += row('Snow', snowCells(ps));
+        body += row('Freeze', freezeCells(ps));
         body += altRows(ps);
         body += sepRow();
       });
