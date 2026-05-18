@@ -168,7 +168,7 @@
 
   <textarea
     id="input"
-    placeholder="Paste inReach message — D0518:30% wc61 fz5500 sn3 cm50 7:5S 5:15S 45:13S …"
+    placeholder="Paste inReach message containing the encoded forecast…"
     autocorrect="off"
     autocapitalize="off"
     spellcheck="false"
@@ -254,13 +254,56 @@
       return { style: `background:${b.bg};color:${b.fg}`, html };
     }
 
-    // Parse MMDD string into a Date object (current year, adjusted if in the past)
-    function parseDayKey(mmdd) {
-      const mm = parseInt(mmdd.slice(0, 2)) - 1;
-      const dd = parseInt(mmdd.slice(2, 4));
-      const now = new Date();
-      const d = new Date(now.getFullYear(), mm, dd);
-      return d;
+    // ── 6-bit printable-ASCII decoder ────────────────────────────────────────
+
+    // Must match encoding.py SAFE64 exactly (Base64 alphabet, 6 bits each)
+    const SAFE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const S2I = Object.fromEntries([...SAFE64].map((c, i) => [c, i]));
+
+    // WMO codes in index order — must match encoding.py WMO_CODES
+    const WMO_CODES = [0,1,2,3,45,48,51,53,55,56,57,61,63,65,66,67,71,73,75,77,80,81,82,85,86,95,96,99];
+    const CARDINALS = ['N','NE','E','SE','S','SW','W','NW'];
+
+    function safeToBits(s) {
+      const bits = [];
+      for (const c of s) {
+        const idx = S2I[c];
+        if (idx === undefined) continue;          // skip non-alphabet chars (inReach headers)
+        for (let b = 5; b >= 0; b--) bits.push((idx >> b) & 1);
+      }
+      return bits;
+    }
+
+    function readInt(bits, pos, n) {
+      let v = 0;
+      for (let i = 0; i < n; i++) v = (v << 1) | (bits[pos + i] || 0);
+      return [v, pos + n];
+    }
+
+    function decodeDay(bits, startPos) {
+      let pos = startPos;
+      const take = n => { const [v, p] = readInt(bits, pos, n); pos = p; return v; };
+
+      const wcIdx    = take(5);
+      const precip   = take(4) * 10;
+      const freeze_ft = take(8) * 100;
+      const snow_in  = take(5);
+      const cloud_mid = take(4) * 10;
+      const spd700   = take(5) * 5;  const dir700 = take(3);
+      const spd500   = take(5) * 5;  const dir500 = take(3);
+      const spd450   = take(5) * 5;  const dir450 = take(3);
+
+      return {
+        endPos: pos,
+        wc:     WMO_CODES[wcIdx] ?? 0,
+        precip,
+        fz_ft:  freeze_ft,
+        snow:   snow_in,
+        cloud:  cloud_mid,
+        p700:   { ws: spd700, dir: CARDINALS[dir700] },
+        p500:   { ws: spd500, dir: CARDINALS[dir500] },
+        p450:   { ws: spd450, dir: CARDINALS[dir450] },
+      };
     }
 
     function dayLabel(date) {
@@ -268,60 +311,36 @@
       return `${weekdays[date.getDay()]}<br><span style="font-weight:400;opacity:.7">${date.getMonth()+1}/${date.getDate()}</span>`;
     }
 
+    // Returns array of day objects or null if input can't be decoded
     function parse(text) {
+      const bits = safeToBits(text);
+      if (bits.length < 9 + 50) return null;
+
+      let [month, pos] = readInt(bits, 0, 4);
+      let [day]        = readInt(bits, pos, 5);
+      pos += 5;
+
+      if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+      // Compute start date; roll to next year if > 180 days in the past
+      const today = new Date();
+      const start = new Date(today.getFullYear(), month - 1, day);
+      if ((today - start) / 86400000 > 180) start.setFullYear(start.getFullYear() + 1);
+
       const days = [];
-      const re = /D(\d{4}):(.*?)(?=\s+D\d{4}:|$)/g;
-      let m;
-      while ((m = re.exec(text)) !== null) {
-        const mmdd    = m[1];
-        const content = m[2].trim();
-
-        // Precip
-        const precipM = content.match(/\b(\d+)%/);
-
-        // WMO code
-        const wcM = content.match(/\bwc(\d+)\b/);
-
-        // Freezing level: new = fz{feet int}, old = fz{km}k
-        const fzM = content.match(/\bfz([\d.]+)(k)?/);
-        let fz_ft = null;
-        if (fzM) {
-          fz_ft = fzM[2] === 'k'
-            ? Math.round(parseFloat(fzM[1]) * 3280.84 / 100) * 100
-            : parseInt(fzM[1]);
-        }
-
-        // Mid cloud cover
-        const cmM = content.match(/\bcm(\d+)\b/);
-
-        // Snow accumulation (inches)
-        const snM = content.match(/\bsn(\d+)\b/);
-
-        // Altitude winds — match longest key first to avoid 5: matching inside 45:
-        const altRe = /\b(45|7|5):(\d+)(NE|NW|SE|SW|N|E|S|W)?/g;
-        const alts = {};
-        let am;
-        while ((am = altRe.exec(content)) !== null) {
-          alts[am[1]] = { ws: parseInt(am[2]), dir: am[3] || '' };
-        }
-
-        days.push({
-          date:   parseDayKey(mmdd),
-          precip: precipM ? parseInt(precipM[1]) : 0,
-          wc:     wcM     ? parseInt(wcM[1])      : 0,
-          fz_ft,
-          cloud:  cmM     ? parseInt(cmM[1])      : 0,
-          snow:   snM     ? parseInt(snM[1])      : 0,
-          p700:   alts['7']  || null,
-          p500:   alts['5']  || null,
-          p450:   alts['45'] || null,
-        });
+      while (pos + 50 <= bits.length) {
+        const d = decodeDay(bits, pos);
+        const date = new Date(start);
+        date.setDate(date.getDate() + days.length);
+        days.push({ date, ...d });
+        pos = d.endPos;
       }
-      return days;
+
+      return days.length ? days : null;
     }
 
     function render(days) {
-      if (!days.length) return '<p class="empty">No D1: pattern found.</p>';
+      if (!days.length) return '<p class="empty">Could not decode forecast.</p>';
 
       const hasAlt = days.some(d => d.p700 || d.p500 || d.p450);
 
@@ -414,10 +433,10 @@
     const output = document.getElementById('output');
 
     input.addEventListener('input', () => {
-      const days = parse(input.value);
-      output.innerHTML = days.length
-        ? render(days)
-        : (input.value.trim() ? '<p class="empty">No D1: pattern found.</p>' : '');
+      const result = parse(input.value);
+      output.innerHTML = result
+        ? render(result)
+        : (input.value.trim() ? '<p class="empty">Could not decode forecast.</p>' : '');
     });
 
     if ('serviceWorker' in navigator) {

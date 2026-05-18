@@ -1,8 +1,11 @@
 """
-Binary forecast encoding using the GSM 03.38 7-bit default alphabet.
+Binary forecast encoding using a printable-ASCII 6-bit alphabet.
 
-Each GSM character carries 7 bits, so 160 characters = 1,120 bits.
-A 10-day forecast fits in 509 bits → 73 GSM characters.
+Each character carries 6 bits, so 85 characters → 510 bits (≥ 509 needed).
+A 10-day forecast uses 509 bits → 85 characters (1 bit of padding).
+
+Alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
+(standard Base64 characters — all printable, no control chars, safe to copy/paste)
 
 Per-day bit layout (50 bits):
   5  weathercode  — index into WMO_CODES (28 used codes)
@@ -23,7 +26,7 @@ Header (9 bits):
   4  month  — 1-12
   5  day    — 1-31
 
-Full message: 9 + 10 × 50 = 509 bits → 73 GSM chars
+Full message: 9 + 10 × 50 = 509 bits → 85 chars
 """
 
 import datetime
@@ -33,33 +36,24 @@ from bitarray import bitarray
 from bitarray.util import ba2int, int2ba
 from pydantic import BaseModel
 
-# GSM 03.38 default 7-bit alphabet — 128 unique characters.
-GSM_CHARS = (
-    "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\x1bÆæßÉ "  # 0x00–0x20
-    "!\"#¤%&'()*+,-./"                            # 0x21–0x2F
-    "0123456789:;<=>?"                             # 0x30–0x3F
-    "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§"            # 0x40–0x5F
-    "¿abcdefghijklmnopqrstuvwxyzäöñüà"            # 0x60–0x7F
-)
-assert len(GSM_CHARS) == 128, f"GSM charset must be 128 chars, got {len(GSM_CHARS)}"
-assert len(set(GSM_CHARS)) == 128, "GSM charset must have no duplicates"
-
-_C2I = {c: i for i, c in enumerate(GSM_CHARS)}
-_I2C = {i: c for i, c in enumerate(GSM_CHARS)}
+# Printable-ASCII 6-bit alphabet — 64 unique characters, no control chars.
+SAFE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+_S2I = {c: i for i, c in enumerate(SAFE64)}
 
 
-def encode_gsm(bits: bitarray) -> str:
-    """Pack bits into GSM characters (7 bits each). Pads with zeros to multiple of 7."""
-    pad = (7 - len(bits) % 7) % 7
+def encode_safe(bits: bitarray) -> str:
+    """Pack bits into printable ASCII (6 bits each). Pads with zeros to multiple of 6."""
+    pad = (6 - len(bits) % 6) % 6
     b = bits + bitarray(pad)
-    return "".join(_I2C[ba2int(b[i:i + 7])] for i in range(0, len(b), 7))
+    return "".join(SAFE64[ba2int(b[i:i + 6])] for i in range(0, len(b), 6))
 
 
-def decode_gsm(s: str) -> bitarray:
-    """Unpack GSM characters back into a bitarray."""
+def decode_safe(s: str) -> bitarray:
+    """Unpack printable ASCII back into a bitarray (skips unknown chars)."""
     b = bitarray()
     for c in s:
-        b.extend(int2ba(_C2I[c], length=7))
+        if c in _S2I:
+            b.extend(int2ba(_S2I[c], length=6))
     return b
 
 
@@ -171,11 +165,11 @@ class Forecast(BaseModel):
         return cls(month=month, day=day, days=days)
 
     def encode(self) -> str:
-        return encode_gsm(self.to_bits())
+        return encode_safe(self.to_bits())
 
     @classmethod
     def decode(cls, s: str) -> "Forecast":
-        return cls.from_bits(decode_gsm(s))
+        return cls.from_bits(decode_safe(s))
 
     @property
     def start_date(self) -> datetime.date:
