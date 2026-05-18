@@ -146,8 +146,8 @@
     /* Altitude wind */
     .wind-cell { font-family: monospace; font-size: 0.82rem; white-space: nowrap; }
     .wind-spd   { font-weight: 600; }
-    .wind-dir   { color: #888; font-size: 0.75rem; }
-    .wind-arrow { color: #555; }
+    .wind-dir   { font-size: 0.75rem; }
+    .wind-arrow { }
 
     .nil { color: #ccc; font-size: 0.75rem; }
 
@@ -209,7 +209,7 @@
       99: ['Thunder + hail',       'Thunder/hail',   '⛈️'],
     };
 
-    const ARROWS = { N:'↑', NE:'↗', E:'→', SE:'↘', S:'↓', SW:'↙', W:'←', NW:'↖' };
+    const ARROWS = { N:'↓', NE:'↙', E:'←', SE:'↖', S:'↑', SW:'↗', W:'→', NW:'↘' };
 
     // Beaufort: [mph upper bound, label, bg color, fg color]
     const BEAUFORT = [
@@ -289,6 +289,9 @@
             : parseInt(fzM[1]);
         }
 
+        // Mid cloud cover
+        const cmM = content.match(/\bcm(\d+)\b/);
+
         // Snow accumulation (inches)
         const snM = content.match(/\bsn(\d+)\b/);
 
@@ -307,6 +310,7 @@
           precip: precipM ? parseInt(precipM[1]) : 0,
           wc:     wcM     ? parseInt(wcM[1])      : 0,
           fz_ft,
+          cloud:  cmM     ? parseInt(cmM[1])      : 0,
           snow:   snM     ? parseInt(snM[1])      : 0,
           p700:   alts['7']  || null,
           p500:   alts['5']  || null,
@@ -348,6 +352,16 @@
       // Gust row — Beaufort color, speed + direction only
       const gustCells = days.map(d => windCell(d.gust, d.dir, true));
 
+      // Cloud cover row
+      const cloudCells = days.map(d =>
+        d.cloud
+          ? `<div class="precip-pct" style="color:#777">${d.cloud}%</div>
+             <div class="precip-bar">
+               <div class="precip-fill" style="width:${d.cloud}%;background:#aaa"></div>
+             </div>`
+          : '<span class="nil">—</span>'
+      );
+
       // Precip row
       const precipCells = days.map(d => {
         const c = precipColor(d.precip);
@@ -367,8 +381,7 @@
       // Freeze row — feet only
       const freezeCells = days.map(d =>
         d.fz_ft != null
-          ? `<div class="fz-val">${d.fz_ft.toLocaleString()}</div>
-             <div class="snow-unit">ft</div>`
+          ? `<span class="fz-val">${d.fz_ft.toLocaleString()}</span> <span class="snow-unit">ft</span>`
           : '<span class="nil">—</span>'
       );
 
@@ -392,6 +405,7 @@
           ${row('', iconCells)}
           ${sectionRow('Surface')}
           ${row('Gust', gustCells)}
+          ${row('Cloud mid', cloudCells)}
           ${row('Precip', precipCells)}
           ${row('Snow', snowCells)}
           ${row('Freeze', freezeCells)}

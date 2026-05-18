@@ -112,6 +112,9 @@ def fetch_forecast() -> str:
             entry += f" fz{fz_ft}"
         if snow_in:
             entry += f" sn{snow_in}"
+        cloud_mid = _round10(r.get("cloudcover_mid"))
+        if cloud_mid:
+            entry += f" cm{cloud_mid}"
 
         # Altitude winds: 700 hPa (~10k ft), 500 hPa (~18k ft), 450 hPa (~20k ft / summit)
         for lvl, key in [(700, "7"), (500, "5"), (450, "45")]:
