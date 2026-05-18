@@ -1,5 +1,7 @@
 import logging
 import re
+
+import requests
 from flask import Flask, request
 
 logging.basicConfig(level=logging.INFO)
@@ -27,3 +29,46 @@ def inbound():
 @app.route("/health", methods=["GET"])
 def health():
     return "OK", 200
+
+
+def send_garmin_reply(reply_url: str, reply_address: str, message: str) -> bool:
+    """
+    reply_url: the inreachlink.com URL from the Garmin email
+    reply_address: your email (shown as sender to the device)
+    message: the forecast text, max 160 chars
+    """
+    session = requests.Session()
+
+    # Follow redirect from inreachlink.com -> us0.explore.garmin.com
+    page = session.get(reply_url)
+
+    # Extract Guid and MessageId from hidden inputs in the HTML
+    guid = re.search(r'id="Guid"[^>]+value="([^"]+)"', page.text).group(1)
+    message_id = re.search(r'id="MessageId"[^>]+value="([^"]+)"', page.text).group(1)
+
+    # POST to the resolved base URL (us0.explore.garmin.com)
+    base_url = page.url.split("/textmessage")[0]
+    api_url = f"{base_url}/TextMessage/TxtMsg"
+
+    response = session.post(
+        api_url,
+        json={
+            "ReplyAddress": reply_address,
+            "ReplyMessage": message,
+            "Guid": guid,
+            "MessageId": message_id,
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+
+    result = response.json()
+    return result.get("Success", False)
+
+
+if __name__ == "__main__":
+    success = send_garmin_reply(
+        reply_url="https://inreachlink.com/g3ER8EmX53PBrwwj2SN40kg",
+        reply_address="wx@email.laneaasen.com",
+        message="test program",
+    )
+    print("Success:", success)
