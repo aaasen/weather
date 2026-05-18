@@ -14,15 +14,23 @@ app = Flask(__name__)
 def inbound():
     form = request.form
     text = form.get("text", "")
+    sender = form.get("from", "")
     match = re.search(r"https://inreachlink\.com/\S+", text)
     reply_url = match.group(0) if match else None
 
     logger.info("=== Inbound Email ===")
-    logger.info("from: %s", form.get("from"))
+    logger.info("from: %s", sender)
     logger.info("subject: %s", form.get("subject"))
     logger.info("text: %s", text)
     logger.info("reply_url: %s", reply_url)
     logger.info("full form dict: %s", dict(form))
+
+    if reply_url:
+        # Extract just the message body, stripping the reply URL
+        body = text.replace(reply_url, "").strip()
+        success = send_garmin_reply(reply_url, sender, body)
+        logger.info("echo reply sent: %s", success)
+
     return "OK", 200
 
 
