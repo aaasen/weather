@@ -240,7 +240,7 @@
       <tr><td>6h</td><td>5-day, 6-hourly · ECMWF</td></tr>
       <tr><td>12h</td><td>5-day, 12-hourly · ECMWF + GFS</td></tr>
     </table>
-    <p class="models-note">Altitude levels: 700 hPa ≈ 10k ft &nbsp;·&nbsp; 500 hPa ≈ 18k ft &nbsp;·&nbsp; 450 hPa ≈ 20k ft (summit)</p>
+    <p class="models-note">Altitude levels: 700 hPa ≈ 10k ft &nbsp;·&nbsp; 500 hPa ≈ 18k ft &nbsp;·&nbsp; 400 hPa ≈ 23k ft (above summit)</p>
   </details>
 
   <script>
@@ -383,7 +383,7 @@
       [w,  pos] = readWinds(bits, pos);
       return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
                fz_ft: fz * 100, snow: sn, cloud: cl * 10,
-               p700: w[0], p500: w[1], p450: w[2] };
+               p700: w[0], p500: w[1], p400: w[2] };
     }
 
     function decodeSubPeriod(bits, pos) {
@@ -395,7 +395,7 @@
       [w,  pos] = readWinds(bits, pos);
       return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
                fz_ft: fz * 100, cloud: cl * 10,
-               p700: w[0], p500: w[1], p450: w[2] };
+               p700: w[0], p500: w[1], p400: w[2] };
     }
 
     function decodeCompactPeriod(bits, pos) {
@@ -404,7 +404,7 @@
       [pr, pos] = readInt(bits, pos, 4);
       [w,  pos] = readWinds(bits, pos);
       return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
-               p700: w[0], p500: w[1], p450: w[2] };
+               p700: w[0], p500: w[1], p400: w[2] };
     }
 
     // ── Parse ─────────────────────────────────────────────────────────────────
@@ -557,12 +557,12 @@
       function altRows(ps) {
         const w700 = ps.map(p => p.p700 ? windCell(p.p700.ws, p.p700.dir, true) : '<span class="nil">—</span>');
         const w500 = ps.map(p => p.p500 ? windCell(p.p500.ws, p.p500.dir, true) : '<span class="nil">—</span>');
-        const w450 = ps.map(p => p.p450 ? windCell(p.p450.ws, p.p450.dir, true) : '<span class="nil">—</span>');
+        const w400 = ps.map(p => p.p400 ? windCell(p.p400.ws, p.p400.dir, true) : '<span class="nil">—</span>');
         return `
           ${sectionRow('Alt')}
           ${row('700<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~10k ft</span>', w700)}
           ${row('500<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~18k ft</span>', w500)}
-          ${row('450<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~20k ft</span>', w450)}`;
+          ${row('400<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~23k ft</span>', w400)}`;
       }
 
       const th = `<th class="lbl"></th>${primary.map(p => `<th class="day-h">${periodLabel(p.date, timeStep)}</th>`).join('')}`;

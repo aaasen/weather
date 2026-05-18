@@ -12,11 +12,11 @@ Common header (12 bits):
 
 Period types:
   Full    (50 bits) — daily, primary model
-    5 wc  4 precip  8 freeze  5 snow  4 cloud  8 w700  8 w500  8 w450
+    5 wc  4 precip  8 freeze  5 snow  4 cloud  8 w700  8 w500  8 w400
   Sub     (45 bits) — sub-daily, primary model (no snow)
-    5 wc  4 precip  8 freeze  4 cloud  8 w700  8 w500  8 w450
+    5 wc  4 precip  8 freeze  4 cloud  8 w700  8 w500  8 w400
   Compact (33 bits) — additional models
-    5 wc  4 precip  8 w700  8 w500  8 w450
+    5 wc  4 precip  8 w700  8 w500  8 w400
 
 Type layout (header + interleaved slots):
   0 (10d-daily-2m):  12 + 10×(Full+Compact)         =  842 bits
@@ -101,7 +101,7 @@ class ForecastType(IntEnum):
 
 
 OPENMETEO_MODELS: dict[str, str] = {
-    "ECMWF": "ecmwf_ifs04",
+    "ECMWF": "ecmwf_ifs025",
     "GFS": "gfs_seamless",
     "ICON": "icon_seamless",
 }
@@ -214,8 +214,8 @@ class PeriodFull(BaseModel):
     wind_700_dir: int
     wind_500_mph: int
     wind_500_dir: int
-    wind_450_mph: int
-    wind_450_dir: int
+    wind_400_mph: int
+    wind_400_dir: int
 
     def to_bits(self) -> bitarray:
         b = bitarray()
@@ -228,7 +228,7 @@ class PeriodFull(BaseModel):
             b,
             (self.wind_700_mph, self.wind_700_dir),
             (self.wind_500_mph, self.wind_500_dir),
-            (self.wind_450_mph, self.wind_450_dir),
+            (self.wind_400_mph, self.wind_400_dir),
         )
         assert len(b) == self.BITS
         return b
@@ -251,8 +251,8 @@ class PeriodFull(BaseModel):
             wind_700_dir=w[0][1],
             wind_500_mph=w[1][0],
             wind_500_dir=w[1][1],
-            wind_450_mph=w[2][0],
-            wind_450_dir=w[2][1],
+            wind_400_mph=w[2][0],
+            wind_400_dir=w[2][1],
         ), pos
 
 
@@ -268,8 +268,8 @@ class PeriodSub(BaseModel):
     wind_700_dir: int
     wind_500_mph: int
     wind_500_dir: int
-    wind_450_mph: int
-    wind_450_dir: int
+    wind_400_mph: int
+    wind_400_dir: int
 
     def to_bits(self) -> bitarray:
         b = bitarray()
@@ -281,7 +281,7 @@ class PeriodSub(BaseModel):
             b,
             (self.wind_700_mph, self.wind_700_dir),
             (self.wind_500_mph, self.wind_500_dir),
-            (self.wind_450_mph, self.wind_450_dir),
+            (self.wind_400_mph, self.wind_400_dir),
         )
         assert len(b) == self.BITS
         return b
@@ -302,8 +302,8 @@ class PeriodSub(BaseModel):
             wind_700_dir=w[0][1],
             wind_500_mph=w[1][0],
             wind_500_dir=w[1][1],
-            wind_450_mph=w[2][0],
-            wind_450_dir=w[2][1],
+            wind_400_mph=w[2][0],
+            wind_400_dir=w[2][1],
         ), pos
 
 
@@ -317,8 +317,8 @@ class PeriodCompact(BaseModel):
     wind_700_dir: int
     wind_500_mph: int
     wind_500_dir: int
-    wind_450_mph: int
-    wind_450_dir: int
+    wind_400_mph: int
+    wind_400_dir: int
 
     def to_bits(self) -> bitarray:
         b = bitarray()
@@ -328,7 +328,7 @@ class PeriodCompact(BaseModel):
             b,
             (self.wind_700_mph, self.wind_700_dir),
             (self.wind_500_mph, self.wind_500_dir),
-            (self.wind_450_mph, self.wind_450_dir),
+            (self.wind_400_mph, self.wind_400_dir),
         )
         assert len(b) == self.BITS
         return b
@@ -345,8 +345,8 @@ class PeriodCompact(BaseModel):
             wind_700_dir=w[0][1],
             wind_500_mph=w[1][0],
             wind_500_dir=w[1][1],
-            wind_450_mph=w[2][0],
-            wind_450_dir=w[2][1],
+            wind_400_mph=w[2][0],
+            wind_400_dir=w[2][1],
         ), pos
 
 
@@ -458,8 +458,8 @@ if __name__ == "__main__":
         wind_700_dir=4,
         wind_500_mph=30,
         wind_500_dir=4,
-        wind_450_mph=25,
-        wind_450_dir=4,
+        wind_400_mph=25,
+        wind_400_dir=4,
     )
     sample_compact = PeriodCompact(
         weathercode=73,
@@ -468,8 +468,8 @@ if __name__ == "__main__":
         wind_700_dir=4,
         wind_500_mph=35,
         wind_500_dir=4,
-        wind_450_mph=30,
-        wind_450_dir=4,
+        wind_400_mph=30,
+        wind_400_dir=4,
     )
 
     msg = ForecastMessage(

@@ -3,27 +3,32 @@ import datetime
 import requests
 
 from encoding import (
-    CARDINAL_TO_IDX, ForecastMessage, ForecastType,
-    OPENMETEO_MODELS, PeriodCompact, PeriodFull, PeriodSub,
-    TYPE_KEYWORDS, TYPE_MODELS,
+    CARDINAL_TO_IDX,
+    OPENMETEO_MODELS,
+    TYPE_KEYWORDS,
+    TYPE_MODELS,
+    ForecastMessage,
+    ForecastType,
+    PeriodCompact,
+    PeriodFull,
+    PeriodSub,
 )
 
-FORECAST_LAT  = 63.0692
-FORECAST_LON  = -151.0070
-FORECAST_ELEV = 6190
-FORECAST_TZ   = "America/Anchorage"
+FORECAST_LAT = 63.0692
+FORECAST_LON = -151.0070
+FORECAST_TZ = "America/Anchorage"
 
 _SURFACE_VARS = [
     "wind_speed_10m",
     "wind_direction_10m",
     "wind_gusts_10m",
     "precipitation_probability",
-    "weathercode",
-    "cloudcover_mid",
+    "weather_code",
+    "cloud_cover_mid",
     "freezing_level_height",
     "snowfall",
 ]
-_PRESSURE_LEVELS   = [500, 450, 700]
+_PRESSURE_LEVELS = [500, 400, 700]
 _PRESSURE_VAR_NAMES = ["temperature", "wind_speed", "wind_direction"]
 
 
@@ -43,37 +48,41 @@ def _round10(v: float | None) -> int:
 
 # ── API fetch helpers ─────────────────────────────────────────────────────────
 
+
 def _fetch_hourly(model_key: str, n_days: int) -> tuple[dict, list[str]]:
     """Fetch raw hourly data for one model. Returns (hourly_vars, times)."""
     pressure_vars = [
         f"{v}_{l}hPa" for v in _PRESSURE_VAR_NAMES for l in _PRESSURE_LEVELS
     ]
     params = {
-        "latitude":        FORECAST_LAT,
-        "longitude":       FORECAST_LON,
-        "elevation":       FORECAST_ELEV,
-        "hourly":          ",".join(_SURFACE_VARS + pressure_vars),
+        "latitude": FORECAST_LAT,
+        "longitude": FORECAST_LON,
+        "hourly": ",".join(_SURFACE_VARS + pressure_vars),
         "wind_speed_unit": "mph",
-        "timezone":        FORECAST_TZ,
-        "forecast_days":   n_days,
-        "models":          OPENMETEO_MODELS[model_key],
+        "timezone": FORECAST_TZ,
+        "forecast_days": n_days,
+        "models": OPENMETEO_MODELS[model_key],
     }
     resp = requests.get(
         "https://api.open-meteo.com/v1/forecast", params=params, timeout=15
     )
+    print(resp.url)
     resp.raise_for_status()
     h = resp.json()["hourly"]
+    print(f"  {model_key} sample[0]: " + ", ".join(
+        f"{k}={v[0]}" for k, v in h.items() if k != "time"
+    ))
     return h, h["time"]
 
 
 def _build_row(h: dict, times: list[str], idx: int, snow_cm: float = 0.0) -> dict:
     row: dict = {
-        "time":             times[idx],
-        "precip":           h["precipitation_probability"][idx],
-        "weathercode":      h["weathercode"][idx],
-        "cloudcover_mid":   h["cloudcover_mid"][idx],
+        "time": times[idx],
+        "precip": h["precipitation_probability"][idx],
+        "weathercode": h["weather_code"][idx],
+        "cloudcover_mid": h["cloud_cover_mid"][idx],
         "freezing_level_m": h["freezing_level_height"][idx],
-        "snow_cm":          snow_cm,
+        "snow_cm": snow_cm,
     }
     for v in _PRESSURE_VAR_NAMES:
         for l in _PRESSURE_LEVELS:
@@ -114,6 +123,7 @@ def _hour_rows(model_key: str, n_days: int, target_hours: list[int]) -> list[dic
 
 # ── Row → period converters ───────────────────────────────────────────────────
 
+
 def _to_full(r: dict) -> PeriodFull:
     fz_m = r.get("freezing_level_m") or 0
     return PeriodFull(
@@ -126,8 +136,8 @@ def _to_full(r: dict) -> PeriodFull:
         wind_700_dir=_deg_to_dir_idx(r.get("wind_direction_700hPa")),
         wind_500_mph=_round5(r.get("wind_speed_500hPa")),
         wind_500_dir=_deg_to_dir_idx(r.get("wind_direction_500hPa")),
-        wind_450_mph=_round5(r.get("wind_speed_450hPa")),
-        wind_450_dir=_deg_to_dir_idx(r.get("wind_direction_450hPa")),
+        wind_400_mph=_round5(r.get("wind_speed_400hPa")),
+        wind_400_dir=_deg_to_dir_idx(r.get("wind_direction_400hPa")),
     )
 
 
@@ -142,8 +152,8 @@ def _to_sub(r: dict) -> PeriodSub:
         wind_700_dir=_deg_to_dir_idx(r.get("wind_direction_700hPa")),
         wind_500_mph=_round5(r.get("wind_speed_500hPa")),
         wind_500_dir=_deg_to_dir_idx(r.get("wind_direction_500hPa")),
-        wind_450_mph=_round5(r.get("wind_speed_450hPa")),
-        wind_450_dir=_deg_to_dir_idx(r.get("wind_direction_450hPa")),
+        wind_400_mph=_round5(r.get("wind_speed_400hPa")),
+        wind_400_dir=_deg_to_dir_idx(r.get("wind_direction_400hPa")),
     )
 
 
@@ -155,24 +165,28 @@ def _to_compact(r: dict) -> PeriodCompact:
         wind_700_dir=_deg_to_dir_idx(r.get("wind_direction_700hPa")),
         wind_500_mph=_round5(r.get("wind_speed_500hPa")),
         wind_500_dir=_deg_to_dir_idx(r.get("wind_direction_500hPa")),
-        wind_450_mph=_round5(r.get("wind_speed_450hPa")),
-        wind_450_dir=_deg_to_dir_idx(r.get("wind_direction_450hPa")),
+        wind_400_mph=_round5(r.get("wind_speed_400hPa")),
+        wind_400_dir=_deg_to_dir_idx(r.get("wind_direction_400hPa")),
     )
 
 
-def _make_message(ft: ForecastType, rows_per_model: list[list[dict]],
-                  is_sub: bool) -> str:
+def _make_message(
+    ft: ForecastType, rows_per_model: list[list[dict]], is_sub: bool
+) -> str:
     start = datetime.date.fromisoformat(rows_per_model[0][0]["time"][:10])
     converter = _to_sub if is_sub else _to_full
     primary = [converter(r) for r in rows_per_model[0]]
-    extras  = [[_to_compact(r) for r in rows] for rows in rows_per_model[1:]]
+    extras = [[_to_compact(r) for r in rows] for rows in rows_per_model[1:]]
     return ForecastMessage(
-        type=int(ft), month=start.month, day=start.day,
+        type=int(ft),
+        month=start.month,
+        day=start.day,
         periods=[primary] + extras,
     ).encode()
 
 
 # ── Per-type fetch functions ──────────────────────────────────────────────────
+
 
 def fetch_type0() -> str:
     """10-day daily, 2 models (ECMWF + GFS)."""
@@ -226,10 +240,10 @@ def fetch_type4() -> str:
 
 _FETCH_FN = {
     ForecastType.DAY10_DAILY_2M: fetch_type0,
-    ForecastType.DAY5_DAILY_3M:  fetch_type1,
+    ForecastType.DAY5_DAILY_3M: fetch_type1,
     ForecastType.DAY1_HOURLY_1M: fetch_type2,
-    ForecastType.DAY5_6H_1M:     fetch_type3,
-    ForecastType.DAY5_12H_2M:    fetch_type4,
+    ForecastType.DAY5_6H_1M: fetch_type3,
+    ForecastType.DAY5_12H_2M: fetch_type4,
 }
 
 
@@ -250,32 +264,38 @@ def fetch_forecast(keyword: str = "10d") -> str:
 # ── __main__ ──────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    from encoding import CARDINALS, ForecastMessage, TYPE_LABEL, _MSG_CHARS
+    from encoding import _MSG_CHARS, CARDINALS, TYPE_LABEL, ForecastMessage
 
     for keyword, ft in [
         ("10d", ForecastType.DAY10_DAILY_2M),
-        ("5d",  ForecastType.DAY5_DAILY_3M),
-        ("1d",  ForecastType.DAY1_HOURLY_1M),
-        ("6h",  ForecastType.DAY5_6H_1M),
+        ("5d", ForecastType.DAY5_DAILY_3M),
+        ("1d", ForecastType.DAY1_HOURLY_1M),
+        ("6h", ForecastType.DAY5_6H_1M),
         ("12h", ForecastType.DAY5_12H_2M),
     ]:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Type {int(ft)}: {TYPE_LABEL[ft]}  (keyword: {keyword!r})")
         encoded = fetch_forecast(keyword)
         decoded = ForecastMessage.decode(encoded)
-        models  = TYPE_MODELS[ft]
+        models = TYPE_MODELS[ft]
         print(f"Encoded ({len(encoded)}/{_MSG_CHARS} chars): {encoded!r}")
         print(f"Start date: {decoded.start_date}  periods: {len(decoded.periods[0])}")
         for m_idx, m_name in enumerate(models):
             p0 = decoded.periods[m_idx][0]
             if hasattr(p0, "snow_in"):
-                print(f"  {m_name} period 0: wc={p0.weathercode} precip={p0.precip}% "
-                      f"freeze={p0.freeze_ft}ft snow={p0.snow_in}in cloud={p0.cloud_mid}% "
-                      f"700={p0.wind_700_mph}mph {CARDINALS[p0.wind_700_dir]}")
+                print(
+                    f"  {m_name} period 0: wc={p0.weathercode} precip={p0.precip}% "
+                    f"freeze={p0.freeze_ft}ft snow={p0.snow_in}in cloud={p0.cloud_mid}% "
+                    f"700={p0.wind_700_mph}mph {CARDINALS[p0.wind_700_dir]}"
+                )
             elif hasattr(p0, "cloud_mid"):
-                print(f"  {m_name} period 0: wc={p0.weathercode} precip={p0.precip}% "
-                      f"freeze={p0.freeze_ft}ft cloud={p0.cloud_mid}% "
-                      f"700={p0.wind_700_mph}mph {CARDINALS[p0.wind_700_dir]}")
+                print(
+                    f"  {m_name} period 0: wc={p0.weathercode} precip={p0.precip}% "
+                    f"freeze={p0.freeze_ft}ft cloud={p0.cloud_mid}% "
+                    f"700={p0.wind_700_mph}mph {CARDINALS[p0.wind_700_dir]}"
+                )
             else:
-                print(f"  {m_name} period 0: wc={p0.weathercode} precip={p0.precip}% "
-                      f"700={p0.wind_700_mph}mph {CARDINALS[p0.wind_700_dir]}")
+                print(
+                    f"  {m_name} period 0: wc={p0.weathercode} precip={p0.precip}% "
+                    f"700={p0.wind_700_mph}mph {CARDINALS[p0.wind_700_dir]}"
+                )
