@@ -1,11 +1,9 @@
 """
-Binary forecast encoding using a printable-ASCII 6-bit alphabet.
+Binary forecast encoding using the GSM 03.38 printable alphabet.
 
-Each character carries 6 bits, so 85 characters → 510 bits (≥ 509 needed).
-A 10-day forecast uses 509 bits → 85 characters (1 bit of padding).
-
-Alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
-(standard Base64 characters — all printable, no control chars, safe to copy/paste)
+Uses the 125 printable GSM 03.38 characters (all 128 minus LF, CR, ESC)
+as a base-125 alphabet. 509 bits encodes in exactly 74 characters — just 1
+more than the full 128-char GSM encoding (73 chars), with no control characters.
 
 Per-day bit layout (50 bits):
   5  weathercode  — index into WMO_CODES (28 used codes)
@@ -26,9 +24,10 @@ Header (9 bits):
   4  month  — 1-12
   5  day    — 1-31
 
-Full message: 9 + 10 × 50 = 509 bits → 85 chars
+Full message: 9 + 10 × 50 = 509 bits → 74 GSM chars
 """
 
+import math
 import datetime
 from typing import ClassVar
 
@@ -36,25 +35,46 @@ from bitarray import bitarray
 from bitarray.util import ba2int, int2ba
 from pydantic import BaseModel
 
-# Printable-ASCII 6-bit alphabet — 64 unique characters, no control chars.
-SAFE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-_S2I = {c: i for i, c in enumerate(SAFE64)}
+# GSM 03.38 default alphabet minus LF (10), CR (13), ESC (27) — 125 printable chars.
+SAFE_GSM = (
+    "@£$¥èéùìòÇ"                              # GSM  0- 9
+    "Øø"                                       # GSM 11-12
+    "ÅåΔ_ΦΓΛΩΠΨΣΘΞ"                           # GSM 14-26
+    "ÆæßÉ "                                    # GSM 28-32
+    "!\"#¤%&'()*+,-./"                         # GSM 33-47
+    "0123456789:;<=>?"                         # GSM 48-63
+    "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§"        # GSM 64-95
+    "¿abcdefghijklmnopqrstuvwxyzäöñüà"        # GSM 96-127
+)
+assert len(SAFE_GSM) == 125
+assert len(set(SAFE_GSM)) == 125
+_SG2I = {c: i for i, c in enumerate(SAFE_GSM)}
+
+_MSG_BITS  = 509  # 9 header + 10 × 50 day bits
+_MSG_CHARS = math.ceil(_MSG_BITS * math.log(2) / math.log(125))  # = 74
 
 
-def encode_safe(bits: bitarray) -> str:
-    """Pack bits into printable ASCII (6 bits each). Pads with zeros to multiple of 6."""
-    pad = (6 - len(bits) % 6) % 6
-    b = bits + bitarray(pad)
-    return "".join(SAFE64[ba2int(b[i:i + 6])] for i in range(0, len(b), 6))
+def encode_gsm_safe(bits: bitarray) -> str:
+    """Encode a bitarray as printable GSM chars using base-125 arithmetic."""
+    value = ba2int(bits)
+    chars = []
+    for _ in range(_MSG_CHARS):
+        chars.append(SAFE_GSM[value % 125])
+        value //= 125
+    return "".join(reversed(chars))
 
 
-def decode_safe(s: str) -> bitarray:
-    """Unpack printable ASCII back into a bitarray (skips unknown chars)."""
-    b = bitarray()
+def decode_gsm_safe(s: str) -> bitarray:
+    """Decode base-125 printable GSM chars back to a bitarray."""
+    value = 0
+    count = 0
     for c in s:
-        if c in _S2I:
-            b.extend(int2ba(_S2I[c], length=6))
-    return b
+        if c in _SG2I:
+            value = value * 125 + _SG2I[c]
+            count += 1
+            if count == _MSG_CHARS:
+                break
+    return int2ba(value, length=_MSG_BITS)
 
 
 # WMO weather codes used by Open-Meteo (28 values → 5 bits)
@@ -165,11 +185,11 @@ class Forecast(BaseModel):
         return cls(month=month, day=day, days=days)
 
     def encode(self) -> str:
-        return encode_safe(self.to_bits())
+        return encode_gsm_safe(self.to_bits())
 
     @classmethod
     def decode(cls, s: str) -> "Forecast":
-        return cls.from_bits(decode_safe(s))
+        return cls.from_bits(decode_gsm_safe(s))
 
     @property
     def start_date(self) -> datetime.date:

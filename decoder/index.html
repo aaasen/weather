@@ -254,22 +254,44 @@
       return { style: `background:${b.bg};color:${b.fg}`, html };
     }
 
-    // ── 6-bit printable-ASCII decoder ────────────────────────────────────────
+    // ── GSM 03.38 printable base-125 decoder ─────────────────────────────────
 
-    // Must match encoding.py SAFE64 exactly (Base64 alphabet, 6 bits each)
-    const SAFE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    const S2I = Object.fromEntries([...SAFE64].map((c, i) => [c, i]));
+    // 125 printable GSM chars (all 128 minus LF, CR, ESC) — must match encoding.py SAFE_GSM
+    const SAFE_GSM =
+      "@£$¥èéùìòÇ" +                             // GSM  0- 9
+      "Øø" +                                      // GSM 11-12
+      "ÅåΔ_ΦΓΛΩΠΨΣΘΞ" +                          // GSM 14-26
+      "ÆæßÉ " +                                   // GSM 28-32
+      "!\"#¤%&'()*+,-./" +                        // GSM 33-47
+      "0123456789:;<=>?" +                         // GSM 48-63
+      "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§" +        // GSM 64-95
+      "¿abcdefghijklmnopqrstuvwxyzäöñüà";         // GSM 96-127
+
+    const SG2I = Object.fromEntries([...SAFE_GSM].map((c, i) => [c, i]));
 
     // WMO codes in index order — must match encoding.py WMO_CODES
     const WMO_CODES = [0,1,2,3,45,48,51,53,55,56,57,61,63,65,66,67,71,73,75,77,80,81,82,85,86,95,96,99];
     const CARDINALS = ['N','NE','E','SE','S','SW','W','NW'];
 
+    const MSG_CHARS = 74;
+    const MSG_BITS  = 509;
+
+    // Decode exactly MSG_CHARS safe-GSM chars as a base-125 BigInt, then unpack bits.
     function safeToBits(s) {
-      const bits = [];
+      let value = 0n;
+      let count = 0;
       for (const c of s) {
-        const idx = S2I[c];
-        if (idx === undefined) continue;          // skip non-alphabet chars (inReach headers)
-        for (let b = 5; b >= 0; b--) bits.push((idx >> b) & 1);
+        const idx = SG2I[c];
+        if (idx !== undefined) {
+          value = value * 125n + BigInt(idx);
+          if (++count === MSG_CHARS) break;
+        }
+      }
+      if (count < MSG_CHARS) return null;
+      const bits = new Array(MSG_BITS).fill(0);
+      for (let i = MSG_BITS - 1; i >= 0; i--) {
+        bits[i] = Number(value & 1n);
+        value >>= 1n;
       }
       return bits;
     }
@@ -314,7 +336,7 @@
     // Returns array of day objects or null if input can't be decoded
     function parse(text) {
       const bits = safeToBits(text);
-      if (bits.length < 9 + 50) return null;
+      if (!bits) return null;
 
       let [month, pos] = readInt(bits, 0, 4);
       let [day]        = readInt(bits, pos, 5);
