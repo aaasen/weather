@@ -1,4 +1,8 @@
+import datetime
+
 import requests
+
+from encoding import CARDINAL_TO_IDX, Forecast, ForecastDay
 
 FORECAST_LAT = 63.0692
 FORECAST_LON = -151.0070
@@ -95,40 +99,37 @@ def fetch_noon_data() -> tuple[list[dict], list[str]]:
     return rows, times
 
 
+def _deg_to_dir_idx(deg: float | None) -> int:
+    if deg is None:
+        return 0
+    return round(deg / 45) % 8
+
+
 def fetch_forecast() -> str:
-    """Fetch 5-day Denali forecast and encode as a compact string."""
+    """Fetch Denali forecast and encode as a GSM binary string."""
     rows, _ = fetch_noon_data()
-    parts = []
+    if not rows:
+        return ""
+
+    start = datetime.date.fromisoformat(rows[0]["time"][:10])
+    days = []
     for r in rows:
-        precip = _round10(r["precip"])
-        wc = r["weathercode"] or 0
         fz_m = r["freezing_level_m"]
-        fz_ft = round((fz_m or 0) * 3.28084 / 100) * 100
-        snow_in = round(r.get("snow_cm", 0) / 2.54)
-        cloud_mid = _round10(r.get("cloudcover_mid"))
+        days.append(ForecastDay(
+            weathercode=int(r["weathercode"] or 0),
+            precip=_round10(r["precip"]),
+            freeze_ft=round((fz_m or 0) * 3.28084 / 100) * 100,
+            snow_in=round(r.get("snow_cm", 0) / 2.54),
+            cloud_mid=_round10(r.get("cloudcover_mid")),
+            wind_700_mph=_round5(r.get("wind_speed_700hPa")),
+            wind_700_dir=_deg_to_dir_idx(r.get("wind_direction_700hPa")),
+            wind_500_mph=_round5(r.get("wind_speed_500hPa")),
+            wind_500_dir=_deg_to_dir_idx(r.get("wind_direction_500hPa")),
+            wind_450_mph=_round5(r.get("wind_speed_450hPa")),
+            wind_450_dir=_deg_to_dir_idx(r.get("wind_direction_450hPa")),
+        ))
 
-        # Use actual date (MMDD) so the decoder can show the real day
-        date_str = r["time"][:10].replace("-", "")[4:]  # e.g. "0518"
-        fields = []
-        if precip:
-            fields.append(f"{precip}%")
-        if wc:
-            fields.append(f"wc{int(wc)}")
-        if fz_ft:
-            fields.append(f"fz{fz_ft}")
-        if snow_in:
-            fields.append(f"sn{snow_in}")
-        if cloud_mid:
-            fields.append(f"cm{cloud_mid}")
-        for lvl, key in [(700, "7"), (500, "5"), (450, "45")]:
-            alt_ws = _round5(r.get(f"wind_speed_{lvl}hPa"))
-            alt_wd = r.get(f"wind_direction_{lvl}hPa")
-            if alt_ws:
-                fields.append(f"{key}:{alt_ws}{_deg_to_cardinal(alt_wd)}")
-
-        parts.append(f"D{date_str}:" + " ".join(fields))
-
-    return " ".join(parts)
+    return Forecast(month=start.month, day=start.day, days=days).encode()
 
 
 if __name__ == "__main__":
@@ -154,6 +155,16 @@ if __name__ == "__main__":
             print(f"  {lvl}hPa:   {t}°C  {ws} mph  {wd}°")
 
     encoded = fetch_forecast()
+    decoded = Forecast.decode(encoded)
     print("\n=== Encoded Forecast ===")
     print(encoded)
-    print(f"Length: {len(encoded)} / 160 chars")
+    print(f"Length: {len(encoded)} / 160 GSM chars  ({len(rows) * ForecastDay.BITS + 9} bits)")
+    print("\n=== Decoded Round-trip ===")
+    print(f"Start date: {decoded.start_date}")
+    for i, d in enumerate(decoded.days):
+        from encoding import CARDINALS
+        print(f"  Day {i+1}: wc={d.weathercode} precip={d.precip}% freeze={d.freeze_ft}ft "
+              f"snow={d.snow_in}in cloud={d.cloud_mid}% "
+              f"700={d.wind_700_mph}mph {CARDINALS[d.wind_700_dir]} "
+              f"500={d.wind_500_mph}mph {CARDINALS[d.wind_500_dir]} "
+              f"450={d.wind_450_mph}mph {CARDINALS[d.wind_450_dir]}")
