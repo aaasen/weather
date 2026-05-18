@@ -382,13 +382,13 @@
     function decodeFullPeriod(bits, pos) {
       let wc, pr, fz, sn, cl, w;
       [wc, pos] = readInt(bits, pos, 5);
-      [pr, pos] = readInt(bits, pos, 4);
+      [pr, pos] = readInt(bits, pos, 3);
       [fz, pos] = readInt(bits, pos, 8);
       [sn, pos] = readInt(bits, pos, 5);
-      [cl, pos] = readInt(bits, pos, 4);
+      [cl, pos] = readInt(bits, pos, 3);
       [w,  pos] = readWinds(bits, pos);
-      return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
-               fz_ft: fz * 100, snow: sn, cloud: cl * 10,
+      return { pos, wc: WMO_CODES[wc] ?? 0, precip: Math.round(pr * 12.5),
+               fz_ft: fz * 100, snow: sn, cloud: Math.round(cl * 12.5),
                p500: w[0], p600: w[1], p700: w[2] };
     }
 

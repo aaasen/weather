@@ -39,10 +39,6 @@ def _round5(v: float | None) -> int:
     return round((v or 0) / 5) * 5
 
 
-def _round10(v: float | None) -> int:
-    return round((v or 0) / 10) * 10
-
-
 # ── API fetch helpers ─────────────────────────────────────────────────────────
 
 
@@ -123,10 +119,10 @@ def _to_full(r: dict) -> PeriodFull:
     fz_m = r.get("freezing_level_m") or 0
     return PeriodFull(
         weathercode=int(r.get("weathercode") or 0),
-        precip=_round10(r.get("precip")),
+        precip=int(r.get("precip") or 0),
         freeze_ft=round(fz_m * 3.28084 / 100) * 100,
         snow_in=round(r.get("snow_cm", 0) / 2.54),
-        cloud_mid=_round10(r.get("cloudcover_mid")),
+        cloud_mid=int(r.get("cloudcover_mid") or 0),
         wind_700_mph=_round5(r.get("wind_speed_700hPa")),
         wind_700_dir=_deg_to_dir_idx(r.get("wind_direction_700hPa")),
         wind_500_mph=_round5(r.get("wind_speed_500hPa")),
