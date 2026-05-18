@@ -4,6 +4,8 @@ import re
 import requests
 from flask import Flask, request
 
+from forecast import fetch_forecast, parse_keyword
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -26,10 +28,16 @@ def inbound():
     logger.info("full form dict: %s", dict(form))
 
     if reply_url:
-        # Extract just the message body, stripping the reply URL
-        body = text.replace(reply_url, "").strip()
-        success = send_garmin_reply(reply_url, sender, body)
-        logger.info("echo reply sent: %s", success)
+        body    = text.replace(reply_url, "").strip()
+        keyword = parse_keyword(body)
+        logger.info("forecast type keyword: %r", keyword)
+        try:
+            encoded = fetch_forecast(keyword)
+            success = send_garmin_reply(reply_url, sender, encoded)
+            logger.info("forecast reply sent (keyword=%r, len=%d): %s",
+                        keyword, len(encoded), success)
+        except Exception as exc:
+            logger.error("fetch_forecast failed: %s", exc)
 
     return "OK", 200
 

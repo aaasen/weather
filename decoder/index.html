@@ -54,12 +54,22 @@
     textarea::placeholder { color: #bbb; }
     textarea:focus { border-color: #999; }
 
+    .type-badge {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
     .table-wrap {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       border-radius: 8px;
       border: 1px solid #e0e0e0;
       background: #fff;
+      margin-bottom: 20px;
     }
 
     table { width: 100%; border-collapse: collapse; }
@@ -94,10 +104,10 @@
       font-weight: 700;
       color: #555;
       letter-spacing: 0.04em;
-      min-width: 72px;
+      min-width: 68px;
     }
 
-    tbody tr:not(.section-head) { border-bottom: 1px solid #f0f0f0; }
+    tbody tr:not(.section-head):not(.model-head) { border-bottom: 1px solid #f0f0f0; }
     tbody tr:nth-child(even) td:not(.lbl) { background: #fafafa; }
     tbody tr:nth-child(even) td.lbl      { background: #f4f4f4; }
 
@@ -114,30 +124,30 @@
     }
     tr.section-head td.lbl { background: #e8e8e8 !important; }
 
+    tr.model-head td {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 5px 8px;
+      border-top: 2px solid #e0e0e0;
+      color: #fff;
+    }
+
     /* Weather icon row */
-    .wx-icon  { font-size: 1.6rem; line-height: 1; display: block; }
+    .wx-icon  { font-size: 1.5rem; line-height: 1; display: block; }
     .wx-short { font-size: 0.67rem; color: #666; margin-top: 3px; line-height: 1.2; }
 
     /* Beaufort colored wind cell */
     .bft-mph { font-family: monospace; font-size: 0.82rem; font-weight: 600; }
 
     /* Precip */
-    .precip-pct {
-      font-family: monospace;
-      font-size: 0.85rem;
-      font-weight: 600;
-    }
-    .precip-bar {
-      height: 3px;
-      border-radius: 2px;
-      margin-top: 3px;
-      background: #e8e8e8;
-      overflow: hidden;
-    }
+    .precip-pct { font-family: monospace; font-size: 0.85rem; font-weight: 600; }
+    .precip-bar { height: 3px; border-radius: 2px; margin-top: 3px; background: #e8e8e8; overflow: hidden; }
     .precip-fill { height: 100%; border-radius: 2px; }
 
     /* Snow */
-    .snow-val { font-family: monospace; font-size: 0.85rem; font-weight: 600; color: #5590cc; }
+    .snow-val  { font-family: monospace; font-size: 0.85rem; font-weight: 600; color: #5590cc; }
     .snow-unit { font-size: 0.68rem; color: #aaa; }
 
     /* Freeze */
@@ -145,9 +155,6 @@
 
     /* Altitude wind */
     .wind-cell { font-family: monospace; font-size: 0.82rem; white-space: nowrap; }
-    .wind-spd   { font-weight: 600; }
-    .wind-dir   { font-size: 0.75rem; }
-    .wind-arrow { }
 
     .nil { color: #ccc; font-size: 0.75rem; }
 
@@ -157,6 +164,53 @@
       text-align: center;
       padding: 32px 0;
       font-family: monospace;
+    }
+
+    /* Instructions */
+    .instructions {
+      margin-top: 28px;
+      border-top: 1px solid #e0e0e0;
+      padding-top: 16px;
+    }
+    .instructions summary {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #aaa;
+      cursor: pointer;
+      user-select: none;
+      margin-bottom: 12px;
+    }
+    .instructions summary::-webkit-details-marker { color: #ccc; }
+    .instructions p {
+      font-size: 0.82rem;
+      color: #555;
+      margin-bottom: 10px;
+    }
+    .instructions strong { color: #333; }
+    .instructions table {
+      border-collapse: collapse;
+      width: auto;
+      font-size: 0.8rem;
+    }
+    .instructions td {
+      padding: 5px 10px 5px 0;
+      text-align: left;
+      vertical-align: top;
+      color: #555;
+    }
+    .instructions td:first-child {
+      font-family: monospace;
+      font-weight: 700;
+      color: #333;
+      white-space: nowrap;
+      padding-right: 16px;
+    }
+    .instructions .models-note {
+      font-size: 0.72rem;
+      color: #aaa;
+      margin-top: 10px;
     }
   </style>
 </head>
@@ -176,8 +230,21 @@
 
   <div id="output"></div>
 
+  <details class="instructions" open>
+    <summary>How to request a forecast</summary>
+    <p>Send a message to <strong>wx@email.laneaasen.com</strong> from your inReach. Put the keyword in the message body (subject is ignored):</p>
+    <table>
+      <tr><td>10d</td><td>10-day, daily · ECMWF + GFS <em>(default — send blank)</em></td></tr>
+      <tr><td>5d</td><td>5-day, daily · ECMWF + GFS + ICON</td></tr>
+      <tr><td>1d</td><td>Today, hourly · ECMWF <em>(also: now, today)</em></td></tr>
+      <tr><td>6h</td><td>5-day, 6-hourly · ECMWF</td></tr>
+      <tr><td>12h</td><td>5-day, 12-hourly · ECMWF + GFS</td></tr>
+    </table>
+    <p class="models-note">Altitude levels: 700 hPa ≈ 10k ft &nbsp;·&nbsp; 500 hPa ≈ 18k ft &nbsp;·&nbsp; 450 hPa ≈ 20k ft (summit)</p>
+  </details>
+
   <script>
-    // WMO code → [full label, short label, emoji]
+    // ── WMO lookup ────────────────────────────────────────────────────────────
     const WMO = {
       0:  ['Clear sky',            'Clear',          '☀️'],
       1:  ['Mainly clear',         'Mainly clear',   '🌤️'],
@@ -211,75 +278,68 @@
 
     const ARROWS = { N:'↓', NE:'↙', E:'←', SE:'↖', S:'↑', SW:'↗', W:'→', NW:'↘' };
 
-    // Beaufort: [mph upper bound, label, bg color, fg color]
+    // Beaufort: [mph upper bound, label, bg, fg]
     const BEAUFORT = [
-      [1,        'Calm',         '#7e97a0', '#fff'],
-      [4,        'Light air',    '#7e97a0', '#fff'],
-      [8,        'Lt breeze',    '#82c8ec', '#1a1a1a'],
-      [13,       'Gentle',       '#3a9ecc', '#fff'],
-      [19,       'Moderate',     '#3a9e88', '#fff'],
-      [25,       'Fresh',        '#4a9e30', '#fff'],
-      [32,       'Strong',       '#d47810', '#fff'],
-      [39,       'Near gale',    '#9e2818', '#fff'],
-      [47,       'Gale',         '#dd0028', '#fff'],
-      [55,       'Strong gale',  '#8800aa', '#fff'],
-      [64,       'Storm',        '#5030b0', '#fff'],
-      [73,       'Violent storm','#006888', '#fff'],
-      [Infinity, 'Hurricane',    '#00cc44', '#fff'],
+      [1,        'Calm',          '#7e97a0', '#fff'],
+      [4,        'Light air',     '#7e97a0', '#fff'],
+      [8,        'Lt breeze',     '#82c8ec', '#1a1a1a'],
+      [13,       'Gentle',        '#3a9ecc', '#fff'],
+      [19,       'Moderate',      '#3a9e88', '#fff'],
+      [25,       'Fresh',         '#4a9e30', '#fff'],
+      [32,       'Strong',        '#d47810', '#fff'],
+      [39,       'Near gale',     '#9e2818', '#fff'],
+      [47,       'Gale',          '#dd0028', '#fff'],
+      [55,       'Strong gale',   '#8800aa', '#fff'],
+      [64,       'Storm',         '#5030b0', '#fff'],
+      [73,       'Violent storm', '#006888', '#fff'],
+      [Infinity, 'Hurricane',     '#00cc44', '#fff'],
     ];
 
-    function beaufort(mph) {
-      const i = BEAUFORT.findIndex(([t]) => mph < t);
-      return { n: i, name: BEAUFORT[i][1], bg: BEAUFORT[i][2], fg: BEAUFORT[i][3] };
-    }
+    const MODEL_COLORS = {
+      ECMWF: '#2a6bb5',
+      GFS:   '#2a8f5a',
+      ICON:  '#c06010',
+    };
 
-    function wmoIcon(c)  { return (WMO[c] || ['','','❓'])[2]; }
-    function wmoShort(c) { return (WMO[c] || ['',`wc${c}`,''])[1]; }
+    // ── Type metadata (must match encoding.py) ────────────────────────────────
+    const TYPE_MODELS = [
+      ['ECMWF', 'GFS'],
+      ['ECMWF', 'GFS', 'ICON'],
+      ['ECMWF'],
+      ['ECMWF'],
+      ['ECMWF', 'GFS'],
+    ];
+    const TYPE_LABEL = [
+      '10-day daily · ECMWF + GFS',
+      '5-day daily · ECMWF + GFS + ICON',
+      'Today hourly · ECMWF',
+      '5-day 6-hourly · ECMWF',
+      '5-day 12-hourly · ECMWF + GFS',
+    ];
+    const TYPE_N_PERIODS  = [10, 5, 24, 20, 10];
+    const TYPE_IS_FULL    = [true, true, false, false, false]; // PeriodFull vs PeriodSub
+    const TYPE_HAS_SNOW   = [true, true, false, false, false];
+    const TYPE_TIME_STEP  = [24, 24, 1, 6, 12]; // hours between periods
 
-    function precipColor(pct) {
-      if (pct >= 60) return '#c04040';
-      if (pct >= 30) return '#c08020';
-      return '#4080c8';
-    }
-
-    function windCell(ws, dir, colored = false) {
-      if (!ws && !dir) return '<span class="nil">—</span>';
-      const arrow = dir ? ARROWS[dir] || '' : '';
-      const html = `<div class="wind-cell">
-        <span class="bft-mph">${ws} mph</span>
-        ${dir ? `<span class="wind-dir"> ${dir} ${arrow}</span>` : ''}
-      </div>`;
-      if (!colored || !ws) return html;
-      const b = beaufort(ws);
-      return { style: `background:${b.bg};color:${b.fg}`, html };
-    }
-
-    // ── GSM 03.38 printable base-125 decoder ─────────────────────────────────
-
-    // 125 printable GSM chars (all 128 minus LF, CR, ESC) — must match encoding.py SAFE_GSM
+    // ── GSM printable base-125 decoder ────────────────────────────────────────
     const SAFE_GSM =
-      "@£$¥èéùìòÇ" +                             // GSM  0- 9
-      "Øø" +                                      // GSM 11-12
-      "ÅåΔ_ΦΓΛΩΠΨΣΘΞ" +                          // GSM 14-26
-      "ÆæßÉ " +                                   // GSM 28-32
-      "!\"#¤%&'()*+,-./" +                        // GSM 33-47
-      "0123456789:;<=>?" +                         // GSM 48-63
-      "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§" +        // GSM 64-95
-      "¿abcdefghijklmnopqrstuvwxyzäöñüà";         // GSM 96-127
+      "@£$¥èéùìòÇ" +           // GSM  0- 9
+      "Øø" +                    // GSM 11-12
+      "ÅåΔ_ΦΓΛΩΠΨΣΘΞ" +        // GSM 14-26
+      "ÆæßÉ " +                 // GSM 28-32
+      "!\"#¤%&'()*+,-./" +     // GSM 33-47
+      "0123456789:;<=>?" +      // GSM 48-63
+      "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§" +  // GSM 64-95
+      "¿abcdefghijklmnopqrstuvwxyzäöñüà";   // GSM 96-127
 
     const SG2I = Object.fromEntries([...SAFE_GSM].map((c, i) => [c, i]));
-
-    // WMO codes in index order — must match encoding.py WMO_CODES
     const WMO_CODES = [0,1,2,3,45,48,51,53,55,56,57,61,63,65,66,67,71,73,75,77,80,81,82,85,86,95,96,99];
     const CARDINALS = ['N','NE','E','SE','S','SW','W','NW'];
+    const MSG_CHARS = 157;
+    const MSG_BITS  = 1092;
 
-    const MSG_CHARS = 74;
-    const MSG_BITS  = 509;
-
-    // Decode exactly MSG_CHARS safe-GSM chars as a base-125 BigInt, then unpack bits.
     function safeToBits(s) {
-      let value = 0n;
-      let count = 0;
+      let value = 0n, count = 0;
       for (const c of s) {
         const idx = SG2I[c];
         if (idx !== undefined) {
@@ -302,155 +362,239 @@
       return [v, pos + n];
     }
 
-    function decodeDay(bits, startPos) {
-      let pos = startPos;
-      const take = n => { const [v, p] = readInt(bits, pos, n); pos = p; return v; };
-
-      const wcIdx    = take(5);
-      const precip   = take(4) * 10;
-      const freeze_ft = take(8) * 100;
-      const snow_in  = take(5);
-      const cloud_mid = take(4) * 10;
-      const spd700   = take(5) * 5;  const dir700 = take(3);
-      const spd500   = take(5) * 5;  const dir500 = take(3);
-      const spd450   = take(5) * 5;  const dir450 = take(3);
-
-      return {
-        endPos: pos,
-        wc:     WMO_CODES[wcIdx] ?? 0,
-        precip,
-        fz_ft:  freeze_ft,
-        snow:   snow_in,
-        cloud:  cloud_mid,
-        p700:   { ws: spd700, dir: CARDINALS[dir700] },
-        p500:   { ws: spd500, dir: CARDINALS[dir500] },
-        p450:   { ws: spd450, dir: CARDINALS[dir450] },
-      };
+    function readWinds(bits, pos) {
+      const w = [];
+      for (let i = 0; i < 3; i++) {
+        const [spd, p1] = readInt(bits, pos, 5);
+        const [dir, p2] = readInt(bits, p1, 3);
+        w.push({ ws: spd * 5, dir: CARDINALS[dir] });
+        pos = p2;
+      }
+      return [w, pos];
     }
 
-    function dayLabel(date) {
-      const weekdays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      return `${weekdays[date.getDay()]}<br><span style="font-weight:400;opacity:.7">${date.getMonth()+1}/${date.getDate()}</span>`;
+    function decodeFullPeriod(bits, pos) {
+      let wc, pr, fz, sn, cl, w;
+      [wc, pos] = readInt(bits, pos, 5);
+      [pr, pos] = readInt(bits, pos, 4);
+      [fz, pos] = readInt(bits, pos, 8);
+      [sn, pos] = readInt(bits, pos, 5);
+      [cl, pos] = readInt(bits, pos, 4);
+      [w,  pos] = readWinds(bits, pos);
+      return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
+               fz_ft: fz * 100, snow: sn, cloud: cl * 10,
+               p700: w[0], p500: w[1], p450: w[2] };
     }
 
-    // Returns array of day objects or null if input can't be decoded
+    function decodeSubPeriod(bits, pos) {
+      let wc, pr, fz, cl, w;
+      [wc, pos] = readInt(bits, pos, 5);
+      [pr, pos] = readInt(bits, pos, 4);
+      [fz, pos] = readInt(bits, pos, 8);
+      [cl, pos] = readInt(bits, pos, 4);
+      [w,  pos] = readWinds(bits, pos);
+      return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
+               fz_ft: fz * 100, cloud: cl * 10,
+               p700: w[0], p500: w[1], p450: w[2] };
+    }
+
+    function decodeCompactPeriod(bits, pos) {
+      let wc, pr, w;
+      [wc, pos] = readInt(bits, pos, 5);
+      [pr, pos] = readInt(bits, pos, 4);
+      [w,  pos] = readWinds(bits, pos);
+      return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
+               p700: w[0], p500: w[1], p450: w[2] };
+    }
+
+    // ── Parse ─────────────────────────────────────────────────────────────────
     function parse(text) {
       const bits = safeToBits(text);
       if (!bits) return null;
 
-      let [month, pos] = readInt(bits, 0, 4);
-      let [day]        = readInt(bits, pos, 5);
-      pos += 5;
+      let [t,     pos] = readInt(bits, 0,   3);
+      let [month, p2]  = readInt(bits, pos, 4); pos = p2;
+      let [day,   p3]  = readInt(bits, pos, 5); pos = p3;
 
-      if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+      if (t > 4 || month < 1 || month > 12 || day < 1 || day > 31) return null;
 
-      // Compute start date; roll to next year if > 180 days in the past
+      const models    = TYPE_MODELS[t];
+      const nPeriods  = TYPE_N_PERIODS[t];
+      const isFull    = TYPE_IS_FULL[t];
+      const hasSnow   = TYPE_HAS_SNOW[t];
+      const timeStep  = TYPE_TIME_STEP[t];
+      const nExtra    = models.length - 1;
+      const decodePrimary = isFull ? decodeFullPeriod : decodeSubPeriod;
+
       const today = new Date();
       const start = new Date(today.getFullYear(), month - 1, day);
       if ((today - start) / 86400000 > 180) start.setFullYear(start.getFullYear() + 1);
 
-      const days = [];
-      while (pos + 50 <= bits.length) {
-        const d = decodeDay(bits, pos);
-        const date = new Date(start);
-        date.setDate(date.getDate() + days.length);
-        days.push({ date, ...d });
-        pos = d.endPos;
+      // Base time: noon for daily, midnight for sub-daily
+      const baseMs = timeStep >= 24
+        ? new Date(start.getFullYear(), start.getMonth(), start.getDate(), 12).getTime()
+        : new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0).getTime();
+      const stepMs = timeStep * 3600000;
+
+      const primaryPeriods = [];
+      const extraPeriods   = Array.from({ length: nExtra }, () => []);
+
+      for (let i = 0; i < nPeriods; i++) {
+        const date = new Date(baseMs + i * stepMs);
+        const p = decodePrimary(bits, pos);
+        pos = p.pos;
+        primaryPeriods.push({ ...p, date });
+        for (let m = 0; m < nExtra; m++) {
+          const c = decodeCompactPeriod(bits, pos);
+          pos = c.pos;
+          extraPeriods[m].push({ ...c, date });
+        }
       }
 
-      return days.length ? days : null;
+      return { type: t, label: TYPE_LABEL[t], models, hasSnow, timeStep,
+               periods: [primaryPeriods, ...extraPeriods] };
     }
 
-    function render(days) {
-      if (!days.length) return '<p class="empty">Could not decode forecast.</p>';
+    // ── Render helpers ────────────────────────────────────────────────────────
+    function beaufort(mph) {
+      const i = BEAUFORT.findIndex(([t]) => mph < t);
+      return { bg: BEAUFORT[i][2], fg: BEAUFORT[i][3] };
+    }
 
-      const hasAlt = days.some(d => d.p700 || d.p500 || d.p450);
+    function wmoIcon(c)  { return (WMO[c] || ['','','❓'])[2]; }
+    function wmoShort(c) { return (WMO[c] || ['',`wc${c}`,''])[1]; }
 
-      // row() accepts string or {style, html} per cell
-      function row(label, cells, cls = '') {
+    function precipColor(pct) {
+      if (pct >= 60) return '#c04040';
+      if (pct >= 30) return '#c08020';
+      return '#4080c8';
+    }
+
+    function windCell(ws, dir, colored) {
+      if (ws == null) return '<span class="nil">—</span>';
+      const arrow = dir ? (ARROWS[dir] || '') : '';
+      const inner = `<div class="wind-cell"><span class="bft-mph">${ws} mph</span>${dir ? ` <span style="font-size:.75rem"> ${dir} ${arrow}</span>` : ''}</div>`;
+      if (!colored || !ws) return inner;
+      const b = beaufort(ws);
+      return { style: `background:${b.bg};color:${b.fg}`, html: inner };
+    }
+
+    function periodLabel(date, timeStep) {
+      const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      if (timeStep >= 24) {
+        return `${days[date.getDay()]}<br><span style="font-weight:400;opacity:.7">${date.getMonth()+1}/${date.getDate()}</span>`;
+      } else if (timeStep === 1) {
+        return `${String(date.getHours()).padStart(2,'0')}:00`;
+      } else {
+        return `${days[date.getDay()]}<br><span style="font-weight:400;opacity:.7">${date.getHours()}h</span>`;
+      }
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────────
+    function render(fc) {
+      const { type, label, models, hasSnow, timeStep, periods } = fc;
+      const primary = periods[0];
+      const extras  = periods.slice(1);
+      const n = primary.length;
+
+      function row(lbl, cells, cls = '') {
         const tds = cells.map(c => {
-          if (c && typeof c === 'object' && 'html' in c) {
+          if (c && typeof c === 'object' && 'html' in c)
             return `<td style="${c.style || ''}">${c.html}</td>`;
-          }
           return `<td>${c}</td>`;
         }).join('');
-        return `<tr class="${cls}"><td class="lbl">${label}</td>${tds}</tr>`;
+        return `<tr class="${cls}"><td class="lbl">${lbl}</td>${tds}</tr>`;
       }
 
-      function sectionRow(label) {
-        return `<tr class="section-head">
-          <td class="lbl">${label}</td>
-          ${days.map(() => '<td></td>').join('')}
-        </tr>`;
+      function sectionRow(lbl) {
+        return `<tr class="section-head"><td class="lbl">${lbl}</td>${primary.map(() => '<td></td>').join('')}</tr>`;
       }
 
-      // Icon row
-      const iconCells = days.map(d =>
-        `<span class="wx-icon">${wmoIcon(d.wc)}</span>
-         <div class="wx-short">${wmoShort(d.wc)}</div>`
-      );
+      function modelRow(name) {
+        const color = MODEL_COLORS[name] || '#666';
+        return `<tr class="model-head"><td colspan="${n + 1}" style="background:${color}">${name}</td></tr>`;
+      }
 
-      // Cloud cover row
-      const cloudCells = days.map(d =>
-        d.cloud
-          ? `<div class="precip-pct" style="color:#777">${d.cloud}%</div>
-             <div class="precip-bar">
-               <div class="precip-fill" style="width:${d.cloud}%;background:#aaa"></div>
-             </div>`
-          : '<span class="nil">—</span>'
-      );
+      function iconCells(ps) {
+        return ps.map(p =>
+          `<span class="wx-icon">${wmoIcon(p.wc)}</span><div class="wx-short">${wmoShort(p.wc)}</div>`
+        );
+      }
 
-      // Precip row
-      const precipCells = days.map(d => {
-        const c = precipColor(d.precip);
-        return `<div class="precip-pct" style="color:${c}">${d.precip}%</div>
-                <div class="precip-bar">
-                  <div class="precip-fill" style="width:${d.precip}%;background:${c}"></div>
-                </div>`;
+      function precipCells(ps) {
+        return ps.map(p => {
+          const c = precipColor(p.precip);
+          return `<div class="precip-pct" style="color:${c}">${p.precip}%</div>`+
+                 `<div class="precip-bar"><div class="precip-fill" style="width:${p.precip}%;background:${c}"></div></div>`;
+        });
+      }
+
+      function cloudCells(ps) {
+        return ps.map(p =>
+          p.cloud != null
+            ? `<div class="precip-pct" style="color:#777">${p.cloud}%</div>`+
+              `<div class="precip-bar"><div class="precip-fill" style="width:${p.cloud}%;background:#aaa"></div></div>`
+            : '<span class="nil">—</span>'
+        );
+      }
+
+      function snowCells(ps) {
+        return ps.map(p =>
+          p.snow
+            ? `<span class="snow-val">${p.snow}</span> <span class="snow-unit">in</span>`
+            : '<span class="nil">—</span>'
+        );
+      }
+
+      function freezeCells(ps) {
+        return ps.map(p =>
+          p.fz_ft != null
+            ? `<span class="fz-val">${p.fz_ft.toLocaleString()}</span> <span class="snow-unit">ft</span>`
+            : '<span class="nil">—</span>'
+        );
+      }
+
+      function altRows(ps) {
+        const w700 = ps.map(p => p.p700 ? windCell(p.p700.ws, p.p700.dir, true) : '<span class="nil">—</span>');
+        const w500 = ps.map(p => p.p500 ? windCell(p.p500.ws, p.p500.dir, true) : '<span class="nil">—</span>');
+        const w450 = ps.map(p => p.p450 ? windCell(p.p450.ws, p.p450.dir, true) : '<span class="nil">—</span>');
+        return `
+          ${sectionRow('Alt')}
+          ${row('700<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~10k ft</span>', w700)}
+          ${row('500<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~18k ft</span>', w500)}
+          ${row('450<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~20k ft</span>', w450)}`;
+      }
+
+      const th = `<th class="lbl"></th>${primary.map(p => `<th class="day-h">${periodLabel(p.date, timeStep)}</th>`).join('')}`;
+
+      let body = '';
+
+      // Primary model section
+      if (models.length > 1) body += modelRow(models[0]);
+      body += row('', iconCells(primary));
+      body += sectionRow('Surface');
+      body += row('Cloud mid', cloudCells(primary));
+      body += row('Precip', precipCells(primary));
+      if (hasSnow) body += row('Snow', snowCells(primary));
+      body += row('Freeze', freezeCells(primary));
+      body += altRows(primary);
+
+      // Additional model sections (compact: icon, precip, winds)
+      extras.forEach((ps, mi) => {
+        body += modelRow(models[mi + 1]);
+        body += row('', iconCells(ps));
+        body += row('Precip', precipCells(ps));
+        body += altRows(ps);
       });
 
-      // Snow row
-      const snowCells = days.map(d =>
-        d.snow
-          ? `<span class="snow-val">${d.snow}</span> <span class="snow-unit">in</span>`
-          : '<span class="nil">—</span>'
-      );
-
-      // Freeze row — feet only
-      const freezeCells = days.map(d =>
-        d.fz_ft != null
-          ? `<span class="fz-val">${d.fz_ft.toLocaleString()}</span> <span class="snow-unit">ft</span>`
-          : '<span class="nil">—</span>'
-      );
-
-      // Altitude wind rows — Beaufort colored
-      const alt700 = days.map(d => d.p700 ? windCell(d.p700.ws, d.p700.dir, true) : '<span class="nil">—</span>');
-      const alt500 = days.map(d => d.p500 ? windCell(d.p500.ws, d.p500.dir, true) : '<span class="nil">—</span>');
-      const alt450 = days.map(d => d.p450 ? windCell(d.p450.ws, d.p450.dir, true) : '<span class="nil">—</span>');
-
-      const altRows = hasAlt ? `
-        ${sectionRow('Altitude')}
-        ${row('700<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~10k ft</span>', alt700)}
-        ${row('500<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~18k ft</span>', alt500)}
-        ${row('450<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~20k ft</span>', alt450)}
-      ` : '';
-
-      const th = `<th class="lbl"></th>${days.map(d => `<th class="day-h">${dayLabel(d.date)}</th>`).join('')}`;
-
-      return `<div class="table-wrap"><table>
-        <thead><tr>${th}</tr></thead>
-        <tbody>
-          ${row('', iconCells)}
-          ${sectionRow('Surface')}
-          ${row('Cloud mid', cloudCells)}
-          ${row('Precip', precipCells)}
-          ${row('Snow', snowCells)}
-          ${row('Freeze', freezeCells)}
-          ${altRows}
-        </tbody>
-      </table></div>`;
+      return `<div class="type-badge">${label}</div>
+              <div class="table-wrap"><table>
+                <thead><tr>${th}</tr></thead>
+                <tbody>${body}</tbody>
+              </table></div>`;
     }
 
+    // ── Wire up ───────────────────────────────────────────────────────────────
     const input  = document.getElementById('input');
     const output = document.getElementById('output');
 
