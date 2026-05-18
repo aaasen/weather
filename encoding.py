@@ -16,16 +16,16 @@ Period type (44 bits) — all types and models:
   4  freeze  freezing level 0–15,000 ft, stored in 1,000 ft steps (0–15)
   4  snow    snowfall index 0–15; unit depends on type: 1"/step daily, 0.1"/step sub-daily
   3  cloud   mid-level cloud cover 0–100 %, stored in 12.5 % steps (0–7)
-  8  w500    500 hPa (~18k ft) wind: 5 bits speed (0–155 mph, 5 mph steps) + 3 bits direction (8 cardinals)
-  8  w600    600 hPa (~14k ft) wind: same encoding
-  8  w700    700 hPa (~10k ft) wind: same encoding
+  7  w500    500 hPa (~18k ft) wind: 4 bits speed (0–75 mph, 5 mph steps) + 3 bits direction (8 cardinals)
+  7  w600    600 hPa (~14k ft) wind: same encoding
+  7  w700    700 hPa (~10k ft) wind: same encoding
 
 Type layout (header + interleaved slots):
-  0 (10d-daily-2m):  12 + 10×2×43 =  872 bits
-  1 (5d-daily-3m):   12 +  5×3×43 =  657 bits
-  2 (1d-hourly-1m):  12 + 20×1×43 =  872 bits
-  3 (5d-6h-1m):      12 + 20×1×43 =  872 bits
-  4 (5d-12h-2m):     12 + 10×2×43 =  872 bits
+  0 (10d-daily-2m):  12 + 10×2×40 =  812 bits
+  1 (5d-daily-3m):   12 +  5×3×40 =  612 bits
+  2 (1d-hourly-1m):  12 + 20×1×40 =  812 bits
+  3 (5d-6h-1m):      12 + 20×1×40 =  812 bits
+  4 (5d-12h-2m):     12 + 10×2×40 =  812 bits
 
 Models per type (fixed, primary first):
   0: ECMWF, GFS
@@ -187,14 +187,14 @@ def _take(b: bitarray, pos: int, n: int) -> tuple[int, int]:
 
 def _put_winds(b: bitarray, *pairs: tuple[int, int]) -> None:
     for spd, d in pairs:
-        _put(b, min(spd // 5, 31), 5)
+        _put(b, min(spd // 5, 15), 4)
         _put(b, d % 8, 3)
 
 
 def _take_winds(b: bitarray, pos: int) -> tuple[list[tuple[int, int]], int]:
     result = []
     for _ in range(3):
-        spd, pos = _take(b, pos, 5)
+        spd, pos = _take(b, pos, 4)
         d, pos = _take(b, pos, 3)
         result.append((spd * 5, d))
     return result, pos
@@ -204,9 +204,9 @@ def _take_winds(b: bitarray, pos: int) -> tuple[list[tuple[int, int]], int]:
 
 
 class PeriodFull(BaseModel):
-    """43 bits — one forecast period for any type/model."""
+    """40 bits — one forecast period for any type/model."""
 
-    BITS: ClassVar[int] = 43
+    BITS: ClassVar[int] = 40
     weathercode:  int
     precip:       int
     freeze_ft:    int

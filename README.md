@@ -7,6 +7,7 @@ Denali weather forecasts via InReach.
  - Forecast types
  - Model selection
  - Compression of responses
+ - Denali climbing forecast: https://www.weather.gov/afg/mckinleyclimbing_forecast
 
 ## Forecasts
 

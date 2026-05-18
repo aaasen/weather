@@ -371,7 +371,7 @@
     function readWinds(bits, pos) {
       const w = [];
       for (let i = 0; i < 3; i++) {
-        const [spd, p1] = readInt(bits, pos, 5);
+        const [spd, p1] = readInt(bits, pos, 4);
         const [dir, p2] = readInt(bits, p1, 3);
         w.push({ ws: spd * 5, dir: CARDINALS[dir] });
         pos = p2;
