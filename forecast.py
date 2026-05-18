@@ -28,7 +28,7 @@ _SURFACE_VARS = [
     "freezing_level_height",
     "snowfall",
 ]
-_PRESSURE_LEVELS = [500, 400, 700]
+_PRESSURE_LEVELS = [500, 600, 700]
 _PRESSURE_VAR_NAMES = ["temperature", "wind_speed", "wind_direction"]
 
 
@@ -136,8 +136,8 @@ def _to_full(r: dict) -> PeriodFull:
         wind_700_dir=_deg_to_dir_idx(r.get("wind_direction_700hPa")),
         wind_500_mph=_round5(r.get("wind_speed_500hPa")),
         wind_500_dir=_deg_to_dir_idx(r.get("wind_direction_500hPa")),
-        wind_400_mph=_round5(r.get("wind_speed_400hPa")),
-        wind_400_dir=_deg_to_dir_idx(r.get("wind_direction_400hPa")),
+        wind_600_mph=_round5(r.get("wind_speed_600hPa")),
+        wind_600_dir=_deg_to_dir_idx(r.get("wind_direction_600hPa")),
     )
 
 
@@ -152,8 +152,8 @@ def _to_sub(r: dict) -> PeriodSub:
         wind_700_dir=_deg_to_dir_idx(r.get("wind_direction_700hPa")),
         wind_500_mph=_round5(r.get("wind_speed_500hPa")),
         wind_500_dir=_deg_to_dir_idx(r.get("wind_direction_500hPa")),
-        wind_400_mph=_round5(r.get("wind_speed_400hPa")),
-        wind_400_dir=_deg_to_dir_idx(r.get("wind_direction_400hPa")),
+        wind_600_mph=_round5(r.get("wind_speed_600hPa")),
+        wind_600_dir=_deg_to_dir_idx(r.get("wind_direction_600hPa")),
     )
 
 
@@ -165,8 +165,8 @@ def _to_compact(r: dict) -> PeriodCompact:
         wind_700_dir=_deg_to_dir_idx(r.get("wind_direction_700hPa")),
         wind_500_mph=_round5(r.get("wind_speed_500hPa")),
         wind_500_dir=_deg_to_dir_idx(r.get("wind_direction_500hPa")),
-        wind_400_mph=_round5(r.get("wind_speed_400hPa")),
-        wind_400_dir=_deg_to_dir_idx(r.get("wind_direction_400hPa")),
+        wind_600_mph=_round5(r.get("wind_speed_600hPa")),
+        wind_600_dir=_deg_to_dir_idx(r.get("wind_direction_600hPa")),
     )
 
 

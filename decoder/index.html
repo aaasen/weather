@@ -124,6 +124,12 @@
     }
     tr.section-head td.lbl { background: #e8e8e8 !important; }
 
+    tr.model-sep td {
+      height: 10px;
+      background: #f5f5f5 !important;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
     tr.model-head td {
       font-size: 0.65rem;
       font-weight: 700;
@@ -240,7 +246,7 @@
       <tr><td>6h</td><td>5-day, 6-hourly · ECMWF</td></tr>
       <tr><td>12h</td><td>5-day, 12-hourly · ECMWF + GFS</td></tr>
     </table>
-    <p class="models-note">Altitude levels: 700 hPa ≈ 10k ft &nbsp;·&nbsp; 500 hPa ≈ 18k ft &nbsp;·&nbsp; 400 hPa ≈ 23k ft (above summit)</p>
+    <p class="models-note">Altitude levels: 500 hPa ≈ 18k ft &nbsp;·&nbsp; 600 hPa ≈ 14k ft &nbsp;·&nbsp; 700 hPa ≈ 10k ft</p>
   </details>
 
   <script>
@@ -383,7 +389,7 @@
       [w,  pos] = readWinds(bits, pos);
       return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
                fz_ft: fz * 100, snow: sn, cloud: cl * 10,
-               p700: w[0], p500: w[1], p400: w[2] };
+               p500: w[0], p600: w[1], p700: w[2] };
     }
 
     function decodeSubPeriod(bits, pos) {
@@ -395,7 +401,7 @@
       [w,  pos] = readWinds(bits, pos);
       return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
                fz_ft: fz * 100, cloud: cl * 10,
-               p700: w[0], p500: w[1], p400: w[2] };
+               p500: w[0], p600: w[1], p700: w[2] };
     }
 
     function decodeCompactPeriod(bits, pos) {
@@ -404,7 +410,7 @@
       [pr, pos] = readInt(bits, pos, 4);
       [w,  pos] = readWinds(bits, pos);
       return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
-               p700: w[0], p500: w[1], p400: w[2] };
+               p500: w[0], p600: w[1], p700: w[2] };
     }
 
     // ── Parse ─────────────────────────────────────────────────────────────────
@@ -510,6 +516,10 @@
         return `<tr class="section-head"><td class="lbl">${lbl}</td>${primary.map(() => '<td></td>').join('')}</tr>`;
       }
 
+      function sepRow() {
+        return `<tr class="model-sep">${Array(n + 1).fill('<td></td>').join('')}</tr>`;
+      }
+
       function modelRow(name) {
         const color = MODEL_COLORS[name] || '#666';
         return `<tr class="model-head"><td colspan="${n + 1}" style="background:${color}">${name}</td></tr>`;
@@ -557,12 +567,12 @@
       function altRows(ps) {
         const w700 = ps.map(p => p.p700 ? windCell(p.p700.ws, p.p700.dir, true) : '<span class="nil">—</span>');
         const w500 = ps.map(p => p.p500 ? windCell(p.p500.ws, p.p500.dir, true) : '<span class="nil">—</span>');
-        const w400 = ps.map(p => p.p400 ? windCell(p.p400.ws, p.p400.dir, true) : '<span class="nil">—</span>');
+        const w600 = ps.map(p => p.p600 ? windCell(p.p600.ws, p.p600.dir, true) : '<span class="nil">—</span>');
         return `
           ${sectionRow('Alt')}
-          ${row('700<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~10k ft</span>', w700)}
           ${row('500<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~18k ft</span>', w500)}
-          ${row('400<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~23k ft</span>', w400)}`;
+          ${row('600<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~14k ft</span>', w600)}
+          ${row('700<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~10k ft</span>', w700)}`;
       }
 
       const th = `<th class="lbl"></th>${primary.map(p => `<th class="day-h">${periodLabel(p.date, timeStep)}</th>`).join('')}`;
@@ -578,6 +588,7 @@
       if (hasSnow) body += row('Snow', snowCells(primary));
       body += row('Freeze', freezeCells(primary));
       body += altRows(primary);
+      if (models.length > 1) body += sepRow();
 
       // Additional model sections (compact: icon, precip, winds)
       extras.forEach((ps, mi) => {
@@ -585,6 +596,7 @@
         body += row('', iconCells(ps));
         body += row('Precip', precipCells(ps));
         body += altRows(ps);
+        body += sepRow();
       });
 
       return `<div class="type-badge">${label}</div>

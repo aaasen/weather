@@ -12,11 +12,11 @@ Common header (12 bits):
 
 Period types:
   Full    (50 bits) — daily, primary model
-    5 wc  4 precip  8 freeze  5 snow  4 cloud  8 w700  8 w500  8 w400
+    5 wc  4 precip  8 freeze  5 snow  4 cloud  8 w700  8 w500  8 w600
   Sub     (45 bits) — sub-daily, primary model (no snow)
-    5 wc  4 precip  8 freeze  4 cloud  8 w700  8 w500  8 w400
+    5 wc  4 precip  8 freeze  4 cloud  8 w700  8 w500  8 w600
   Compact (33 bits) — additional models
-    5 wc  4 precip  8 w700  8 w500  8 w400
+    5 wc  4 precip  8 w700  8 w500  8 w600
 
 Type layout (header + interleaved slots):
   0 (10d-daily-2m):  12 + 10×(Full+Compact)         =  842 bits
@@ -214,8 +214,8 @@ class PeriodFull(BaseModel):
     wind_700_dir: int
     wind_500_mph: int
     wind_500_dir: int
-    wind_400_mph: int
-    wind_400_dir: int
+    wind_600_mph: int
+    wind_600_dir: int
 
     def to_bits(self) -> bitarray:
         b = bitarray()
@@ -226,9 +226,9 @@ class PeriodFull(BaseModel):
         _put(b, min(self.cloud_mid // 10, 10), 4)
         _put_winds(
             b,
-            (self.wind_700_mph, self.wind_700_dir),
             (self.wind_500_mph, self.wind_500_dir),
-            (self.wind_400_mph, self.wind_400_dir),
+            (self.wind_600_mph, self.wind_600_dir),
+            (self.wind_700_mph, self.wind_700_dir),
         )
         assert len(b) == self.BITS
         return b
@@ -247,12 +247,12 @@ class PeriodFull(BaseModel):
             freeze_ft=fz * 100,
             snow_in=sn,
             cloud_mid=cl * 10,
-            wind_700_mph=w[0][0],
-            wind_700_dir=w[0][1],
-            wind_500_mph=w[1][0],
-            wind_500_dir=w[1][1],
-            wind_400_mph=w[2][0],
-            wind_400_dir=w[2][1],
+            wind_500_mph=w[0][0],
+            wind_500_dir=w[0][1],
+            wind_600_mph=w[1][0],
+            wind_600_dir=w[1][1],
+            wind_700_mph=w[2][0],
+            wind_700_dir=w[2][1],
         ), pos
 
 
@@ -268,8 +268,8 @@ class PeriodSub(BaseModel):
     wind_700_dir: int
     wind_500_mph: int
     wind_500_dir: int
-    wind_400_mph: int
-    wind_400_dir: int
+    wind_600_mph: int
+    wind_600_dir: int
 
     def to_bits(self) -> bitarray:
         b = bitarray()
@@ -279,9 +279,9 @@ class PeriodSub(BaseModel):
         _put(b, min(self.cloud_mid // 10, 10), 4)
         _put_winds(
             b,
-            (self.wind_700_mph, self.wind_700_dir),
             (self.wind_500_mph, self.wind_500_dir),
-            (self.wind_400_mph, self.wind_400_dir),
+            (self.wind_600_mph, self.wind_600_dir),
+            (self.wind_700_mph, self.wind_700_dir),
         )
         assert len(b) == self.BITS
         return b
@@ -298,12 +298,12 @@ class PeriodSub(BaseModel):
             precip=pr * 10,
             freeze_ft=fz * 100,
             cloud_mid=cl * 10,
-            wind_700_mph=w[0][0],
-            wind_700_dir=w[0][1],
-            wind_500_mph=w[1][0],
-            wind_500_dir=w[1][1],
-            wind_400_mph=w[2][0],
-            wind_400_dir=w[2][1],
+            wind_500_mph=w[0][0],
+            wind_500_dir=w[0][1],
+            wind_600_mph=w[1][0],
+            wind_600_dir=w[1][1],
+            wind_700_mph=w[2][0],
+            wind_700_dir=w[2][1],
         ), pos
 
 
@@ -317,8 +317,8 @@ class PeriodCompact(BaseModel):
     wind_700_dir: int
     wind_500_mph: int
     wind_500_dir: int
-    wind_400_mph: int
-    wind_400_dir: int
+    wind_600_mph: int
+    wind_600_dir: int
 
     def to_bits(self) -> bitarray:
         b = bitarray()
@@ -326,9 +326,9 @@ class PeriodCompact(BaseModel):
         _put(b, min(self.precip // 10, 10), 4)
         _put_winds(
             b,
-            (self.wind_700_mph, self.wind_700_dir),
             (self.wind_500_mph, self.wind_500_dir),
-            (self.wind_400_mph, self.wind_400_dir),
+            (self.wind_600_mph, self.wind_600_dir),
+            (self.wind_700_mph, self.wind_700_dir),
         )
         assert len(b) == self.BITS
         return b
@@ -341,12 +341,12 @@ class PeriodCompact(BaseModel):
         return cls(
             weathercode=WMO_CODES[wc] if wc < len(WMO_CODES) else 0,
             precip=pr * 10,
-            wind_700_mph=w[0][0],
-            wind_700_dir=w[0][1],
-            wind_500_mph=w[1][0],
-            wind_500_dir=w[1][1],
-            wind_400_mph=w[2][0],
-            wind_400_dir=w[2][1],
+            wind_500_mph=w[0][0],
+            wind_500_dir=w[0][1],
+            wind_600_mph=w[1][0],
+            wind_600_dir=w[1][1],
+            wind_700_mph=w[2][0],
+            wind_700_dir=w[2][1],
         ), pos
 
 
@@ -458,8 +458,8 @@ if __name__ == "__main__":
         wind_700_dir=4,
         wind_500_mph=30,
         wind_500_dir=4,
-        wind_400_mph=25,
-        wind_400_dir=4,
+        wind_600_mph=25,
+        wind_600_dir=4,
     )
     sample_compact = PeriodCompact(
         weathercode=73,
@@ -468,8 +468,8 @@ if __name__ == "__main__":
         wind_700_dir=4,
         wind_500_mph=35,
         wind_500_dir=4,
-        wind_400_mph=30,
-        wind_400_dir=4,
+        wind_600_mph=30,
+        wind_600_dir=4,
     )
 
     msg = ForecastMessage(
