@@ -10,18 +10,15 @@ Common header (12 bits):
   4  month  — 1-12
   5  day    — 1-31
 
-Period types:
-  Full (50 bits) — daily, all models
-    5 wc  4 precip  8 freeze  5 snow  4 cloud  8 w500  8 w600  8 w700
-  Sub  (45 bits) — sub-daily, all models (no snow)
-    5 wc  4 precip  8 freeze  4 cloud  8 w500  8 w600  8 w700
+Period type (50 bits) — all types and models:
+  5 wc  4 precip  8 freeze  5 snow  4 cloud  8 w500  8 w600  8 w700
 
 Type layout (header + interleaved slots):
-  0 (10d-daily-2m):  12 + 10×2×Full         = 1012 bits
-  1 (5d-daily-3m):   12 +  5×3×Full         =  762 bits
-  2 (1d-hourly-1m):  12 + 24×Sub            = 1092 bits  ← max
-  3 (5d-6h-1m):      12 + 20×Sub            =  912 bits
-  4 (5d-12h-2m):     12 + 10×2×Sub          =  912 bits
+  0 (10d-daily-2m):  12 + 10×2×50 = 1012 bits
+  1 (5d-daily-3m):   12 +  5×3×50 =  762 bits
+  2 (1d-hourly-1m):  12 + 20×1×50 = 1012 bits  (20h to stay ≤ 1092)
+  3 (5d-6h-1m):      12 + 20×1×50 = 1012 bits
+  4 (5d-12h-2m):     12 + 10×2×50 = 1012 bits
 
 Models per type (fixed, primary first):
   0: ECMWF, GFS
@@ -254,102 +251,7 @@ class PeriodFull(BaseModel):
         ), pos
 
 
-class PeriodSub(BaseModel):
-    """45 bits — sub-daily primary model (no snow)."""
-
-    BITS: ClassVar[int] = 45
-    weathercode: int
-    precip: int
-    freeze_ft: int
-    cloud_mid: int
-    wind_700_mph: int
-    wind_700_dir: int
-    wind_500_mph: int
-    wind_500_dir: int
-    wind_600_mph: int
-    wind_600_dir: int
-
-    def to_bits(self) -> bitarray:
-        b = bitarray()
-        _put(b, _WMO2IDX.get(self.weathercode, 0), 5)
-        _put(b, min(self.precip // 10, 10), 4)
-        _put(b, min(self.freeze_ft // 100, 255), 8)
-        _put(b, min(self.cloud_mid // 10, 10), 4)
-        _put_winds(
-            b,
-            (self.wind_500_mph, self.wind_500_dir),
-            (self.wind_600_mph, self.wind_600_dir),
-            (self.wind_700_mph, self.wind_700_dir),
-        )
-        assert len(b) == self.BITS
-        return b
-
-    @classmethod
-    def from_bits(cls, b: bitarray, pos: int) -> tuple["PeriodSub", int]:
-        wc, pos = _take(b, pos, 5)
-        pr, pos = _take(b, pos, 4)
-        fz, pos = _take(b, pos, 8)
-        cl, pos = _take(b, pos, 4)
-        w, pos = _take_winds(b, pos)
-        return cls(
-            weathercode=WMO_CODES[wc] if wc < len(WMO_CODES) else 0,
-            precip=pr * 10,
-            freeze_ft=fz * 100,
-            cloud_mid=cl * 10,
-            wind_500_mph=w[0][0],
-            wind_500_dir=w[0][1],
-            wind_600_mph=w[1][0],
-            wind_600_dir=w[1][1],
-            wind_700_mph=w[2][0],
-            wind_700_dir=w[2][1],
-        ), pos
-
-
-class PeriodCompact(BaseModel):
-    """33 bits — additional models (no freeze/snow/cloud)."""
-
-    BITS: ClassVar[int] = 33
-    weathercode: int
-    precip: int
-    wind_700_mph: int
-    wind_700_dir: int
-    wind_500_mph: int
-    wind_500_dir: int
-    wind_600_mph: int
-    wind_600_dir: int
-
-    def to_bits(self) -> bitarray:
-        b = bitarray()
-        _put(b, _WMO2IDX.get(self.weathercode, 0), 5)
-        _put(b, min(self.precip // 10, 10), 4)
-        _put_winds(
-            b,
-            (self.wind_500_mph, self.wind_500_dir),
-            (self.wind_600_mph, self.wind_600_dir),
-            (self.wind_700_mph, self.wind_700_dir),
-        )
-        assert len(b) == self.BITS
-        return b
-
-    @classmethod
-    def from_bits(cls, b: bitarray, pos: int) -> tuple["PeriodCompact", int]:
-        wc, pos = _take(b, pos, 5)
-        pr, pos = _take(b, pos, 4)
-        w, pos = _take_winds(b, pos)
-        return cls(
-            weathercode=WMO_CODES[wc] if wc < len(WMO_CODES) else 0,
-            precip=pr * 10,
-            wind_500_mph=w[0][0],
-            wind_500_dir=w[0][1],
-            wind_600_mph=w[1][0],
-            wind_600_dir=w[1][1],
-            wind_700_mph=w[2][0],
-            wind_700_dir=w[2][1],
-        ), pos
-
-
-# Backward-compat alias
-ForecastDay = PeriodFull
+PeriodSub = PeriodFull  # removed distinction; kept for any lingering imports
 
 
 # ── ForecastMessage ───────────────────────────────────────────────────────────
@@ -393,23 +295,20 @@ class ForecastMessage:
             raise ValueError(f"Unknown forecast type: {t}")
         ft = ForecastType(t)
 
-        if ft in (ForecastType.DAY10_DAILY_2M, ForecastType.DAY5_DAILY_3M):
-            PrimaryClass = PeriodFull
-            n_periods = 10 if ft == ForecastType.DAY10_DAILY_2M else 5
-        else:
-            PrimaryClass = PeriodSub
-            n_periods = {
-                ForecastType.DAY1_HOURLY_1M: 24,
-                ForecastType.DAY5_6H_1M: 20,
-                ForecastType.DAY5_12H_2M: 10,
-            }[ft]
+        n_periods = {
+            ForecastType.DAY10_DAILY_2M: 10,
+            ForecastType.DAY5_DAILY_3M:   5,
+            ForecastType.DAY1_HOURLY_1M: 20,
+            ForecastType.DAY5_6H_1M:     20,
+            ForecastType.DAY5_12H_2M:    10,
+        }[ft]
 
         n_models = len(TYPE_MODELS[ft])
         all_periods: list[list[Any]] = [[] for _ in range(n_models)]
 
         for _ in range(n_periods):
             for m in range(n_models):
-                p, pos = PrimaryClass.from_bits(b, pos)
+                p, pos = PeriodFull.from_bits(b, pos)
                 all_periods[m].append(p)
 
         return ForecastMessage(type=t, month=month, day=day, periods=all_periods)
@@ -435,40 +334,28 @@ if __name__ == "__main__":
         TYPE_MODELS,
         ForecastMessage,
         ForecastType,
-        PeriodCompact,
         PeriodFull,
-        PeriodSub,
     )
 
-    sample_full = PeriodFull(
+    sample = PeriodFull(
         weathercode=73,
         precip=100,
         freeze_ft=5500,
         snow_in=4,
         cloud_mid=80,
-        wind_700_mph=10,
-        wind_700_dir=4,
         wind_500_mph=30,
         wind_500_dir=4,
         wind_600_mph=25,
         wind_600_dir=4,
-    )
-    sample_compact = PeriodCompact(
-        weathercode=73,
-        precip=80,
-        wind_700_mph=15,
+        wind_700_mph=10,
         wind_700_dir=4,
-        wind_500_mph=35,
-        wind_500_dir=4,
-        wind_600_mph=30,
-        wind_600_dir=4,
     )
 
     msg = ForecastMessage(
         type=int(ForecastType.DAY10_DAILY_2M),
         month=5,
         day=18,
-        periods=[[sample_full] * 10, [sample_compact] * 10],
+        periods=[[sample] * 10, [sample] * 10],
     )
     encoded = msg.encode()
     decoded = ForecastMessage.decode(encoded)
@@ -476,14 +363,10 @@ if __name__ == "__main__":
     print(f"Type: {decoded.forecast_type.name}")
     print(f"Encoded ({len(encoded)} / 160 chars, {_MSG_BITS} bits): {encoded!r}")
     print(f"Start: {decoded.start_date}")
-    p = decoded.periods[0][0]
-    print(
-        f"Day 1 ECMWF: wc={p.weathercode} precip={p.precip}% freeze={p.freeze_ft}ft "
-        f"snow={p.snow_in}in cloud={p.cloud_mid}% "
-        f"700={p.wind_700_mph}mph {CARDINALS[p.wind_700_dir]}"
-    )
-    c = decoded.periods[1][0]
-    print(
-        f"Day 1 GFS:   wc={c.weathercode} precip={c.precip}% "
-        f"700={c.wind_700_mph}mph {CARDINALS[c.wind_700_dir]}"
-    )
+    for m_idx, m_name in enumerate(TYPE_MODELS[ForecastType.DAY10_DAILY_2M]):
+        p = decoded.periods[m_idx][0]
+        print(
+            f"Day 1 {m_name}: wc={p.weathercode} precip={p.precip}% "
+            f"freeze={p.freeze_ft}ft snow={p.snow_in}in cloud={p.cloud_mid}% "
+            f"500={p.wind_500_mph}mph {CARDINALS[p.wind_500_dir]}"
+        )

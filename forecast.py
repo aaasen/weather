@@ -3,15 +3,12 @@ import datetime
 import requests
 
 from encoding import (
-    CARDINAL_TO_IDX,
     OPENMETEO_MODELS,
     TYPE_KEYWORDS,
     TYPE_MODELS,
     ForecastMessage,
     ForecastType,
-    PeriodCompact,
     PeriodFull,
-    PeriodSub,
 )
 
 FORECAST_LAT = 63.0692
@@ -105,14 +102,15 @@ def _noon_rows(model_key: str, n_days: int) -> list[dict]:
 
 
 def _hour_rows(model_key: str, n_days: int, target_hours: list[int]) -> list[dict]:
-    """Rows at specific hours across n_days. Snow omitted (sub-daily)."""
+    """Rows at specific hours across n_days."""
     h, times = _fetch_hourly(model_key, n_days)
+    snow_arr = h.get("snowfall", [])
     n_total = n_days * len(target_hours)
     rows = []
     for i, t in enumerate(times):
         hour = int(t[11:13])
         if hour in target_hours:
-            rows.append(_build_row(h, times, i))
+            rows.append(_build_row(h, times, i, snow_arr[i] or 0.0 if snow_arr else 0.0))
             if len(rows) == n_total:
                 break
     return rows
@@ -138,45 +136,15 @@ def _to_full(r: dict) -> PeriodFull:
     )
 
 
-def _to_sub(r: dict) -> PeriodSub:
-    fz_m = r.get("freezing_level_m") or 0
-    return PeriodSub(
-        weathercode=int(r.get("weathercode") or 0),
-        precip=_round10(r.get("precip")),
-        freeze_ft=round(fz_m * 3.28084 / 100) * 100,
-        cloud_mid=_round10(r.get("cloudcover_mid")),
-        wind_700_mph=_round5(r.get("wind_speed_700hPa")),
-        wind_700_dir=_deg_to_dir_idx(r.get("wind_direction_700hPa")),
-        wind_500_mph=_round5(r.get("wind_speed_500hPa")),
-        wind_500_dir=_deg_to_dir_idx(r.get("wind_direction_500hPa")),
-        wind_600_mph=_round5(r.get("wind_speed_600hPa")),
-        wind_600_dir=_deg_to_dir_idx(r.get("wind_direction_600hPa")),
-    )
-
-
-def _to_compact(r: dict) -> PeriodCompact:
-    return PeriodCompact(
-        weathercode=int(r.get("weathercode") or 0),
-        precip=_round10(r.get("precip")),
-        wind_700_mph=_round5(r.get("wind_speed_700hPa")),
-        wind_700_dir=_deg_to_dir_idx(r.get("wind_direction_700hPa")),
-        wind_500_mph=_round5(r.get("wind_speed_500hPa")),
-        wind_500_dir=_deg_to_dir_idx(r.get("wind_direction_500hPa")),
-        wind_600_mph=_round5(r.get("wind_speed_600hPa")),
-        wind_600_dir=_deg_to_dir_idx(r.get("wind_direction_600hPa")),
-    )
-
-
 def _make_message(
     ft: ForecastType, rows_per_model: list[list[dict]], is_sub: bool
 ) -> str:
     start = datetime.date.fromisoformat(rows_per_model[0][0]["time"][:10])
-    converter = _to_sub if is_sub else _to_full
     return ForecastMessage(
         type=int(ft),
         month=start.month,
         day=start.day,
-        periods=[[converter(r) for r in rows] for rows in rows_per_model],
+        periods=[[_to_full(r) for r in rows] for rows in rows_per_model],
     ).encode()
 
 
@@ -208,8 +176,8 @@ def fetch_type2() -> str:
     models = TYPE_MODELS[ForecastType.DAY1_HOURLY_1M]
     return _make_message(
         ForecastType.DAY1_HOURLY_1M,
-        [_hour_rows(models[0], 1, list(range(24)))],
-        is_sub=True,
+        [_hour_rows(models[0], 1, list(range(20)))],
+        is_sub=False,
     )
 
 
@@ -219,7 +187,7 @@ def fetch_type3() -> str:
     return _make_message(
         ForecastType.DAY5_6H_1M,
         [_hour_rows(models[0], 5, [0, 6, 12, 18])],
-        is_sub=True,
+        is_sub=False,
     )
 
 
@@ -229,7 +197,7 @@ def fetch_type4() -> str:
     return _make_message(
         ForecastType.DAY5_12H_2M,
         [_hour_rows(m, 5, [0, 12]) for m in models],
-        is_sub=True,
+        is_sub=False,
     )
 
 
