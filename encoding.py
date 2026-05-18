@@ -10,10 +10,10 @@ Common header (12 bits):
   4  month  — 1-12
   5  day    — 1-31
 
-Period type (48 bits) — all types and models:
+Period type (44 bits) — all types and models:
   5  wc      WMO weather code; index into 28-value WMO_CODES table
   3  precip  precipitation probability 0–100 %, stored in 12.5 % steps (0–7)
-  8  freeze  freezing level 0–25,500 ft, stored in 100 ft steps
+  4  freeze  freezing level 0–15,000 ft, stored in 1,000 ft steps (0–15)
   5  snow    snowfall 0–31 inches (period accumulation)
   3  cloud   mid-level cloud cover 0–100 %, stored in 12.5 % steps (0–7)
   8  w500    500 hPa (~18k ft) wind: 5 bits speed (0–155 mph, 5 mph steps) + 3 bits direction (8 cardinals)
@@ -21,11 +21,11 @@ Period type (48 bits) — all types and models:
   8  w700    700 hPa (~10k ft) wind: same encoding
 
 Type layout (header + interleaved slots):
-  0 (10d-daily-2m):  12 + 10×2×48 =  972 bits
-  1 (5d-daily-3m):   12 +  5×3×48 =  732 bits
-  2 (1d-hourly-1m):  12 + 20×1×48 =  972 bits
-  3 (5d-6h-1m):      12 + 20×1×48 =  972 bits
-  4 (5d-12h-2m):     12 + 10×2×48 =  972 bits
+  0 (10d-daily-2m):  12 + 10×2×44 =  892 bits
+  1 (5d-daily-3m):   12 +  5×3×44 =  672 bits
+  2 (1d-hourly-1m):  12 + 20×1×44 =  892 bits
+  3 (5d-6h-1m):      12 + 20×1×44 =  892 bits
+  4 (5d-12h-2m):     12 + 10×2×44 =  892 bits
 
 Models per type (fixed, primary first):
   0: ECMWF, GFS
@@ -204,9 +204,9 @@ def _take_winds(b: bitarray, pos: int) -> tuple[list[tuple[int, int]], int]:
 
 
 class PeriodFull(BaseModel):
-    """48 bits — one forecast period for any type/model."""
+    """44 bits — one forecast period for any type/model."""
 
-    BITS: ClassVar[int] = 48
+    BITS: ClassVar[int] = 44
     weathercode:  int
     precip:       int
     freeze_ft:    int
@@ -223,7 +223,7 @@ class PeriodFull(BaseModel):
         b = bitarray()
         _put(b, _WMO2IDX.get(self.weathercode, 0), 5)
         _put(b, min(round(self.precip / 12.5), 7), 3)
-        _put(b, min(self.freeze_ft // 100, 255), 8)
+        _put(b, min(self.freeze_ft // 1000, 15), 4)
         _put(b, min(self.snow_in, 31), 5)
         _put(b, min(round(self.cloud_mid / 12.5), 7), 3)
         _put_winds(
@@ -239,14 +239,14 @@ class PeriodFull(BaseModel):
     def from_bits(cls, b: bitarray, pos: int) -> tuple["PeriodFull", int]:
         wc, pos = _take(b, pos, 5)
         pr, pos = _take(b, pos, 3)
-        fz, pos = _take(b, pos, 8)
+        fz, pos = _take(b, pos, 4)
         sn, pos = _take(b, pos, 5)
         cl, pos = _take(b, pos, 3)
         w, pos = _take_winds(b, pos)
         return cls(
             weathercode=WMO_CODES[wc] if wc < len(WMO_CODES) else 0,
             precip=round(pr * 12.5),
-            freeze_ft=fz * 100,
+            freeze_ft=fz * 1000,
             snow_in=sn,
             cloud_mid=round(cl * 12.5),
             wind_500_mph=w[0][0],

@@ -120,7 +120,7 @@ def _to_full(r: dict) -> PeriodFull:
     return PeriodFull(
         weathercode=int(r.get("weathercode") or 0),
         precip=int(r.get("precip") or 0),
-        freeze_ft=round(fz_m * 3.28084 / 100) * 100,
+        freeze_ft=round(fz_m * 3.28084 / 1000) * 1000,
         snow_in=round(r.get("snow_cm", 0) / 2.54),
         cloud_mid=int(r.get("cloudcover_mid") or 0),
         wind_700_mph=_round5(r.get("wind_speed_700hPa")),

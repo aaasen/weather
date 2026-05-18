@@ -383,12 +383,12 @@
       let wc, pr, fz, sn, cl, w;
       [wc, pos] = readInt(bits, pos, 5);
       [pr, pos] = readInt(bits, pos, 3);
-      [fz, pos] = readInt(bits, pos, 8);
+      [fz, pos] = readInt(bits, pos, 4);
       [sn, pos] = readInt(bits, pos, 5);
       [cl, pos] = readInt(bits, pos, 3);
       [w,  pos] = readWinds(bits, pos);
       return { pos, wc: WMO_CODES[wc] ?? 0, precip: Math.round(pr * 12.5),
-               fz_ft: fz * 100, snow: sn, cloud: Math.round(cl * 12.5),
+               fz_ft: fz * 1000, snow: sn, cloud: Math.round(cl * 12.5),
                p500: w[0], p600: w[1], p700: w[2] };
     }
 
@@ -396,11 +396,11 @@
       let wc, pr, fz, cl, w;
       [wc, pos] = readInt(bits, pos, 5);
       [pr, pos] = readInt(bits, pos, 4);
-      [fz, pos] = readInt(bits, pos, 8);
+      [fz, pos] = readInt(bits, pos, 4);
       [cl, pos] = readInt(bits, pos, 4);
       [w,  pos] = readWinds(bits, pos);
       return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
-               fz_ft: fz * 100, cloud: cl * 10,
+               fz_ft: fz * 1000, cloud: cl * 10,
                p500: w[0], p600: w[1], p700: w[2] };
     }
 
