@@ -11,7 +11,14 @@ Common header (12 bits):
   5  day    — 1-31
 
 Period type (50 bits) — all types and models:
-  5 wc  4 precip  8 freeze  5 snow  4 cloud  8 w500  8 w600  8 w700
+  5  wc      WMO weather code; index into 28-value WMO_CODES table
+  4  precip  precipitation probability 0–100 %, stored in 10 % steps
+  8  freeze  freezing level 0–25,500 ft, stored in 100 ft steps
+  5  snow    snowfall 0–31 inches (period accumulation)
+  4  cloud   mid-level cloud cover 0–100 %, stored in 10 % steps
+  8  w500    500 hPa (~18k ft) wind: 5 bits speed (0–155 mph, 5 mph steps) + 3 bits direction (8 cardinals)
+  8  w600    600 hPa (~14k ft) wind: same encoding
+  8  w700    700 hPa (~10k ft) wind: same encoding
 
 Type layout (header + interleaved slots):
   0 (10d-daily-2m):  12 + 10×2×50 = 1012 bits
@@ -197,20 +204,20 @@ def _take_winds(b: bitarray, pos: int) -> tuple[list[tuple[int, int]], int]:
 
 
 class PeriodFull(BaseModel):
-    """50 bits — daily primary model."""
+    """50 bits — one forecast period for any type/model."""
 
     BITS: ClassVar[int] = 50
-    weathercode: int
-    precip: int  # 0-100 %
-    freeze_ft: int
-    snow_in: int
-    cloud_mid: int  # 0-100 %
-    wind_700_mph: int
-    wind_700_dir: int
+    weathercode:  int
+    precip:       int
+    freeze_ft:    int
+    snow_in:      int
+    cloud_mid:    int
     wind_500_mph: int
     wind_500_dir: int
     wind_600_mph: int
     wind_600_dir: int
+    wind_700_mph: int
+    wind_700_dir: int
 
     def to_bits(self) -> bitarray:
         b = bitarray()
