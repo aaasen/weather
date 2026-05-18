@@ -82,7 +82,7 @@ def fetch_noon_data() -> tuple[list[dict], list[str]]:
 
 
 def fetch_forecast() -> str:
-    """Fetch 5-day Denali forecast and encode as a compact string ≤160 chars."""
+    """Fetch 5-day Denali forecast and encode as a compact string."""
     rows, _ = fetch_noon_data()
     parts = []
     for r in rows:
@@ -102,6 +102,14 @@ def fetch_forecast() -> str:
             entry += f" wc{int(wc)}"
         if fz_km:
             entry += f" fz{fz_km}k"
+
+        # Altitude winds: 700 hPa (~10k ft), 500 hPa (~18k ft), 450 hPa (~20k ft / summit)
+        for lvl, key in [(700, "7"), (500, "5"), (450, "45")]:
+            alt_ws = _round5(r.get(f"wind_speed_{lvl}hPa"))
+            alt_wd = r.get(f"wind_direction_{lvl}hPa")
+            if alt_ws:
+                entry += f" {key}:{alt_ws}{_deg_to_cardinal(alt_wd)}"
+
         parts.append(entry)
 
     return " ".join(parts)
