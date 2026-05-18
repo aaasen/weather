@@ -384,7 +384,7 @@
       [wc, pos] = readInt(bits, pos, 5);
       [pr, pos] = readInt(bits, pos, 3);
       [fz, pos] = readInt(bits, pos, 4);
-      [sn, pos] = readInt(bits, pos, 5);
+      [sn, pos] = readInt(bits, pos, 4);
       [cl, pos] = readInt(bits, pos, 3);
       [w,  pos] = readWinds(bits, pos);
       return { pos, wc: WMO_CODES[wc] ?? 0, precip: Math.round(pr * 12.5),

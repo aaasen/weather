@@ -2,8 +2,7 @@
 Binary forecast encoding — 157 printable GSM chars for all forecast types.
 
 Uses 125 printable GSM 03.38 chars (all 128 minus LF, CR, ESC) as a base-125
-alphabet. All messages encode to exactly 157 chars (covers 1092 bits, the
-maximum needed by any type).
+alphabet.
 
 Common header (12 bits):
   3  type   — forecast type 0-4
@@ -207,11 +206,11 @@ class PeriodFull(BaseModel):
     """40 bits — one forecast period for any type/model."""
 
     BITS: ClassVar[int] = 40
-    weathercode:  int
-    precip:       int
-    freeze_ft:    int
-    snow_in:      int
-    cloud_mid:    int
+    weathercode: int
+    precip: int
+    freeze_ft: int
+    snow_in: int
+    cloud_mid: int
     wind_500_mph: int
     wind_500_dir: int
     wind_600_mph: int
@@ -304,10 +303,10 @@ class ForecastMessage:
 
         n_periods = {
             ForecastType.DAY10_DAILY_2M: 10,
-            ForecastType.DAY5_DAILY_3M:   5,
+            ForecastType.DAY5_DAILY_3M: 5,
             ForecastType.DAY1_HOURLY_1M: 20,
-            ForecastType.DAY5_6H_1M:     20,
-            ForecastType.DAY5_12H_2M:    10,
+            ForecastType.DAY5_6H_1M: 20,
+            ForecastType.DAY5_12H_2M: 10,
         }[ft]
 
         n_models = len(TYPE_MODELS[ft])
