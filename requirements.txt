@@ -1,2 +1,5 @@
+bitarray
 flask
 gunicorn
+pydantic
+requests
