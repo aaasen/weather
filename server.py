@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import traceback
 
 import requests
 from flask import Flask, request, send_from_directory, Response
@@ -11,6 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 DECODER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "decoder")
+REPLY_ADDRESS = "wx@email.laneaasen.com"
 
 app = Flask(__name__)
 
@@ -51,15 +53,16 @@ def inbound():
         logger.info("forecast type keyword: %r", keyword)
         try:
             encoded = fetch_forecast(keyword)
-            success = send_garmin_reply(reply_url, sender, encoded)
-            logger.info(
-                "forecast reply sent (keyword=%r, len=%d): %s",
-                keyword,
-                len(encoded),
-                success,
-            )
-        except Exception as exc:
-            logger.error("fetch_forecast failed: %s", exc)
+            logger.info("forecast fetched (keyword=%r, len=%d): %s", keyword, len(encoded), encoded)
+        except Exception:
+            logger.error("fetch_forecast failed:\n%s", traceback.format_exc())
+            return "OK", 200
+
+        try:
+            success = send_garmin_reply(reply_url, REPLY_ADDRESS, encoded)
+            logger.info("garmin reply sent: %s", success)
+        except Exception:
+            logger.error("send_garmin_reply failed:\n%s", traceback.format_exc())
 
     return "OK", 200
 
