@@ -43,25 +43,25 @@ from pydantic import BaseModel
 
 # ── Alphabet ──────────────────────────────────────────────────────────────────
 
-# Printable ASCII 32–126 (space through ~) — 95 chars.
-ALPHABET = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
-assert len(ALPHABET) == 95
-assert len(set(ALPHABET)) == 95
+# Printable ASCII 33–126 (! through ~) — 94 chars.
+ALPHABET = "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+assert len(ALPHABET) == 94
+assert len(set(ALPHABET)) == 94
 _A2I = {c: i for i, c in enumerate(ALPHABET)}
 
 _MSG_BITS = 1092
-_MSG_CHARS = math.ceil(_MSG_BITS * math.log(2) / math.log(95))  # = 167
+_MSG_CHARS = math.ceil(_MSG_BITS * math.log(2) / math.log(94))  # = 167
 
 
 def encode(bits: bitarray) -> str:
-    """Encode bits as 167 printable ASCII chars using base-95. Pads with zeros."""
+    """Encode bits as 167 printable ASCII chars using base-94. Pads with zeros."""
     if len(bits) < _MSG_BITS:
         bits = bits + bitarray(_MSG_BITS - len(bits))
     value = ba2int(bits[:_MSG_BITS])
     chars = []
     for _ in range(_MSG_CHARS):
-        chars.append(ALPHABET[value % 95])
-        value //= 95
+        chars.append(ALPHABET[value % 94])
+        value //= 94
     return "".join(reversed(chars))
 
 
@@ -71,7 +71,7 @@ def decode(s: str) -> bitarray:
     count = 0
     for c in s:
         if c in _A2I:
-            value = value * 95 + _A2I[c]
+            value = value * 94 + _A2I[c]
             count += 1
             if count == _MSG_CHARS:
                 break

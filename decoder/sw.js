@@ -1,4 +1,4 @@
-const CACHE = 'denali-wx-v1';
+const CACHE = 'denali-wx-v2';
 const FILES = ['/', '/index.html', '/manifest.json', '/sw.js'];
 
 self.addEventListener('install', e => {

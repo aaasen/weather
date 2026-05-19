@@ -1,6 +1,10 @@
-# Denali
+# Satellite Weather
 
-Denali weather forecasts via Garmin inReach satellite messenger.
+Weather forecasts via Garmin inReach satellite messenger.
+
+The goal of this project is to provide better weather forecasts than the default inReach system. Forecasts are sourced from [Open-Meteo](https://open-meteo.com/). They are encoded with a custom binary encoding to maximize information density. Using this encoding, it is possible to get 10-day daily forecasts in a single message.
+
+## Usage
 
 Send a message to `wx@email.laneaasen.com` from your inReach device. Include a forecast type keyword in the body (default: `10d`):
 
@@ -12,7 +16,14 @@ Send a message to `wx@email.laneaasen.com` from your inReach device. Include a f
 | `6h` | 5-day 6-hourly · ECMWF |
 | `12h` | 5-day 12-hourly · ECMWF + GFS |
 
-The reply is 157 printable GSM characters. Decode it at the decoder page (`decoder/index.html`).
+Copy the response into the decoder app at [weather.laneaasen.com](https://weather.laneaasen.com/). 
+
+## Offline Usage
+
+The decoder app is a Progressive Web App (PWA) that can be installed on your phone for offline use.
+
+Open [weather.laneaasen.com](https://weather.laneaasen.com/) in your browser and tap the share button. Select "Add to Home Screen" to install the app on your phone.
+
 
 ## Architecture
 
