@@ -8,7 +8,7 @@ from encoding import (
     TYPE_MODELS,
     ForecastMessage,
     ForecastType,
-    PeriodFull,
+    Period,
 )
 
 FORECAST_LAT = 63.0692
@@ -115,11 +115,11 @@ def _hour_rows(model_key: str, n_days: int, target_hours: list[int]) -> list[dic
 # ── Row → period converters ───────────────────────────────────────────────────
 
 
-def _to_full(r: dict, daily: bool = True) -> PeriodFull:
+def _to_full(r: dict, daily: bool = True) -> Period:
     fz_m = r.get("freezing_level_m") or 0
     snow_cm = r.get("snow_cm") or 0
     snow_in = round(snow_cm / 2.54) if daily else round(snow_cm / 0.254)
-    return PeriodFull(
+    return Period(
         weathercode=int(r.get("weathercode") or 0),
         precip=int(r.get("precip") or 0),
         freeze_ft=round(fz_m * 3.28084 / 1000) * 1000,

@@ -1,19 +1,16 @@
 """
-Binary forecast encoding — 157 printable GSM chars for all forecast types.
-
-Uses 125 printable GSM 03.38 chars (all 128 minus LF, CR, ESC) as a base-125
-alphabet.
+Binary forecast encoding using 95 printable ASCII characters 32–126 (space through ~) as a base-95 alphabet.
 
 Common header (12 bits):
   3  type   — forecast type 0-4
   4  month  — 1-12
   5  day    — 1-31
 
-Period type (44 bits) — all types and models:
+Period (40 bits) — all types and models:
   5  wc      WMO weather code; index into 28-value WMO_CODES table
   3  precip  precipitation probability 0–100 %, stored in 12.5 % steps (0–7)
   4  freeze  freezing level 0–15,000 ft, stored in 1,000 ft steps (0–15)
-  4  snow    snowfall index 0–15; unit depends on type: 1"/step daily, 0.1"/step sub-daily
+  4  snow    snowfall 0–15; unit depends on type: 1"/step daily, 0.1"/step sub-daily
   3  cloud   mid-level cloud cover 0–100 %, stored in 12.5 % steps (0–7)
   7  w500    500 hPa (~18k ft) wind: 4 bits speed (0–75 mph, 5 mph steps) + 3 bits direction (8 cardinals)
   7  w600    600 hPa (~14k ft) wind: same encoding
@@ -52,11 +49,11 @@ assert len(ALPHABET) == 95
 assert len(set(ALPHABET)) == 95
 _A2I = {c: i for i, c in enumerate(ALPHABET)}
 
-_MSG_BITS = 1092  # type 2: 12 + 24×45
+_MSG_BITS = 1092
 _MSG_CHARS = math.ceil(_MSG_BITS * math.log(2) / math.log(95))  # = 167
 
 
-def encode_gsm_safe(bits: bitarray) -> str:
+def encode(bits: bitarray) -> str:
     """Encode bits as 167 printable ASCII chars using base-95. Pads with zeros."""
     if len(bits) < _MSG_BITS:
         bits = bits + bitarray(_MSG_BITS - len(bits))
@@ -68,7 +65,7 @@ def encode_gsm_safe(bits: bitarray) -> str:
     return "".join(reversed(chars))
 
 
-def decode_gsm_safe(s: str) -> bitarray:
+def decode(s: str) -> bitarray:
     """Decode 167 printable ASCII chars back to a 1092-bit bitarray."""
     value = 0
     count = 0
@@ -114,7 +111,6 @@ TYPE_LABEL: dict[ForecastType, str] = {
     ForecastType.DAY5_12H_2M: "5-day 12-hourly · ECMWF + GFS",
 }
 
-# Keywords that users send to request each type
 TYPE_KEYWORDS: dict[str, ForecastType] = {
     "10d": ForecastType.DAY10_DAILY_2M,
     "5d": ForecastType.DAY5_DAILY_3M,
@@ -190,10 +186,10 @@ def _take_winds(b: bitarray, pos: int) -> tuple[list[tuple[int, int]], int]:
     return result, pos
 
 
-# ── Period classes ────────────────────────────────────────────────────────────
+# ── Period ────────────────────────────────────────────────────────────────────
 
 
-class PeriodFull(BaseModel):
+class Period(BaseModel):
     """40 bits — one forecast period for any type/model."""
 
     BITS: ClassVar[int] = 40
@@ -226,7 +222,7 @@ class PeriodFull(BaseModel):
         return b
 
     @classmethod
-    def from_bits(cls, b: bitarray, pos: int) -> tuple["PeriodFull", int]:
+    def from_bits(cls, b: bitarray, pos: int) -> tuple["Period", int]:
         wc, pos = _take(b, pos, 5)
         pr, pos = _take(b, pos, 3)
         fz, pos = _take(b, pos, 4)
@@ -248,18 +244,14 @@ class PeriodFull(BaseModel):
         ), pos
 
 
-PeriodSub = PeriodFull  # removed distinction; kept for any lingering imports
-
-
 # ── ForecastMessage ───────────────────────────────────────────────────────────
 
 
 @dataclass
 class ForecastMessage:
     """
-    Encodes any forecast type to 157 GSM chars.
+    Encodes any forecast type to 167 printable ASCII chars.
 
-    All models use PeriodFull (daily types) or PeriodSub (sub-daily types).
     Within each time slot, models are interleaved in TYPE_MODELS order.
     """
 
@@ -279,11 +271,11 @@ class ForecastMessage:
         return b
 
     def encode(self) -> str:
-        return encode_gsm_safe(self.to_bits())
+        return encode(self.to_bits())
 
     @staticmethod
     def decode(s: str) -> "ForecastMessage":
-        b = decode_gsm_safe(s)
+        b = decode(s)
         t, pos = _take(b, 0, 3)
         month, pos = _take(b, pos, 4)
         day, pos = _take(b, pos, 5)
@@ -305,7 +297,7 @@ class ForecastMessage:
 
         for _ in range(n_periods):
             for m in range(n_models):
-                p, pos = PeriodFull.from_bits(b, pos)
+                p, pos = Period.from_bits(b, pos)
                 all_periods[m].append(p)
 
         return ForecastMessage(type=t, month=month, day=day, periods=all_periods)
@@ -324,17 +316,7 @@ class ForecastMessage:
 
 
 if __name__ == "__main__":
-    from encoding import (
-        _MSG_BITS,
-        _MSG_CHARS,
-        CARDINALS,
-        TYPE_MODELS,
-        ForecastMessage,
-        ForecastType,
-        PeriodFull,
-    )
-
-    sample = PeriodFull(
+    sample = Period(
         weathercode=73,
         precip=100,
         freeze_ft=5500,
@@ -351,14 +333,14 @@ if __name__ == "__main__":
     msg = ForecastMessage(
         type=int(ForecastType.DAY10_DAILY_2M),
         month=5,
-        day=18,
+        day=19,
         periods=[[sample] * 10, [sample] * 10],
     )
     encoded = msg.encode()
     decoded = ForecastMessage.decode(encoded)
 
     print(f"Type: {decoded.forecast_type.name}")
-    print(f"Encoded ({len(encoded)} / 160 chars, {_MSG_BITS} bits): {encoded!r}")
+    print(f"Encoded ({len(encoded)}/{_MSG_CHARS} chars): {encoded!r}")
     print(f"Start: {decoded.start_date}")
     for m_idx, m_name in enumerate(TYPE_MODELS[ForecastType.DAY10_DAILY_2M]):
         p = decoded.periods[m_idx][0]
