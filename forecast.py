@@ -239,7 +239,7 @@ if __name__ == "__main__":
         encoded = fetch_forecast(keyword)
         decoded = ForecastMessage.decode(encoded)
         models = TYPE_MODELS[ft]
-        print(f"Encoded ({len(encoded)}/{_MSG_CHARS} chars): {encoded!r}")
+        print(f"Encoded ({len(encoded)}/{_MSG_CHARS} chars): {encoded}")
         print(f"Start date: {decoded.start_date}  periods: {len(decoded.periods[0])}")
         for m_idx, m_name in enumerate(models):
             p0 = decoded.periods[m_idx][0]

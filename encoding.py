@@ -340,7 +340,7 @@ if __name__ == "__main__":
     decoded = ForecastMessage.decode(encoded)
 
     print(f"Type: {decoded.forecast_type.name}")
-    print(f"Encoded ({len(encoded)}/{_MSG_CHARS} chars): {encoded!r}")
+    print(f"Encoded ({len(encoded)}/{_MSG_CHARS} chars): {encoded}")
     print(f"Start: {decoded.start_date}")
     for m_idx, m_name in enumerate(TYPE_MODELS[ForecastType.DAY10_DAILY_2M]):
         p = decoded.periods[m_idx][0]
