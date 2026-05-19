@@ -46,44 +46,35 @@ from pydantic import BaseModel
 
 # ── Alphabet ──────────────────────────────────────────────────────────────────
 
-# GSM 03.38 default alphabet minus LF (10), CR (13), ESC (27) — 125 printable chars.
-SAFE_GSM = (
-    "@£$¥èéùìòÇ"  # GSM  0- 9
-    "Øø"  # GSM 11-12
-    "ÅåΔ_ΦΓΛΩΠΨΣΘΞ"  # GSM 14-26
-    "ÆæßÉ "  # GSM 28-32
-    "!\"#¤%&'()*+,-./"  # GSM 33-47
-    "0123456789:;<=>?"  # GSM 48-63
-    "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§"  # GSM 64-95
-    "¿abcdefghijklmnopqrstuvwxyzäöñüà"  # GSM 96-127
-)
-assert len(SAFE_GSM) == 125
-assert len(set(SAFE_GSM)) == 125
-_SG2I = {c: i for i, c in enumerate(SAFE_GSM)}
+# Printable ASCII 32–126 (space through ~) — 95 chars.
+ALPHABET = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+assert len(ALPHABET) == 95
+assert len(set(ALPHABET)) == 95
+_A2I = {c: i for i, c in enumerate(ALPHABET)}
 
 _MSG_BITS = 1092  # type 2: 12 + 24×45
-_MSG_CHARS = math.ceil(_MSG_BITS * math.log(2) / math.log(125))  # = 157
+_MSG_CHARS = math.ceil(_MSG_BITS * math.log(2) / math.log(95))  # = 167
 
 
 def encode_gsm_safe(bits: bitarray) -> str:
-    """Encode bits as 157 printable GSM chars using base-125. Pads with zeros."""
+    """Encode bits as 167 printable ASCII chars using base-95. Pads with zeros."""
     if len(bits) < _MSG_BITS:
         bits = bits + bitarray(_MSG_BITS - len(bits))
     value = ba2int(bits[:_MSG_BITS])
     chars = []
     for _ in range(_MSG_CHARS):
-        chars.append(SAFE_GSM[value % 125])
-        value //= 125
+        chars.append(ALPHABET[value % 95])
+        value //= 95
     return "".join(reversed(chars))
 
 
 def decode_gsm_safe(s: str) -> bitarray:
-    """Decode 157 printable GSM chars back to a 1092-bit bitarray."""
+    """Decode 167 printable ASCII chars back to a 1092-bit bitarray."""
     value = 0
     count = 0
     for c in s:
-        if c in _SG2I:
-            value = value * 125 + _SG2I[c]
+        if c in _A2I:
+            value = value * 95 + _A2I[c]
             count += 1
             if count == _MSG_CHARS:
                 break
