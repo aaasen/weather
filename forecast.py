@@ -225,7 +225,7 @@ def fetch_forecast(keyword: str = "10d") -> str:
 # ── __main__ ──────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    from encoding import _MSG_CHARS, CARDINALS, TYPE_LABEL, ForecastMessage
+    from encoding import CARDINALS, TYPE_LABEL, ForecastMessage
 
     for keyword, ft in [
         ("10d", ForecastType.DAY10_DAILY_2M),
@@ -239,7 +239,7 @@ if __name__ == "__main__":
         encoded = fetch_forecast(keyword)
         decoded = ForecastMessage.decode(encoded)
         models = TYPE_MODELS[ft]
-        print(f"Encoded ({len(encoded)}/{_MSG_CHARS} chars): {encoded}")
+        print(f"Encoded ({len(encoded)} chars): {encoded}")
         print(f"Start date: {decoded.start_date}  periods: {len(decoded.periods[0])}")
         for m_idx, m_name in enumerate(models):
             p0 = decoded.periods[m_idx][0]

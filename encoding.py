@@ -1,5 +1,5 @@
 """
-Binary forecast encoding using 95 printable ASCII characters 32–126 (space through ~) as a base-95 alphabet.
+Binary forecast encoding using 94 printable ASCII characters 33–126 (! through ~) as a base-94 alphabet.
 
 Common header (12 bits):
   3  type   — forecast type 0-4
@@ -49,33 +49,29 @@ assert len(ALPHABET) == 94
 assert len(set(ALPHABET)) == 94
 _A2I = {c: i for i, c in enumerate(ALPHABET)}
 
-_MSG_BITS = 1092
-_MSG_CHARS = math.ceil(_MSG_BITS * math.log(2) / math.log(94))  # = 167
+def _n_chars(n_bits: int) -> int:
+    return math.ceil(n_bits * math.log(2) / math.log(94))
 
 
 def encode(bits: bitarray) -> str:
-    """Encode bits as 167 printable ASCII chars using base-94. Pads with zeros."""
-    if len(bits) < _MSG_BITS:
-        bits = bits + bitarray(_MSG_BITS - len(bits))
-    value = ba2int(bits[:_MSG_BITS])
+    """Encode a bitarray to the minimum number of base-94 ASCII chars."""
+    n_bits = len(bits)
+    n_chars = _n_chars(n_bits)
+    value = ba2int(bits)
     chars = []
-    for _ in range(_MSG_CHARS):
+    for _ in range(n_chars):
         chars.append(ALPHABET[value % 94])
         value //= 94
     return "".join(reversed(chars))
 
 
-def decode(s: str) -> bitarray:
-    """Decode 167 printable ASCII chars back to a 1092-bit bitarray."""
+def decode(s: str, n_bits: int) -> bitarray:
+    """Decode a base-94 ASCII string back to exactly n_bits bits."""
     value = 0
-    count = 0
     for c in s:
         if c in _A2I:
             value = value * 94 + _A2I[c]
-            count += 1
-            if count == _MSG_CHARS:
-                break
-    return int2ba(value, length=_MSG_BITS)
+    return int2ba(value, length=n_bits)
 
 
 # ── Type / model registry ─────────────────────────────────────────────────────
@@ -244,13 +240,21 @@ class Period(BaseModel):
         ), pos
 
 
+# Maps encoded message length (chars) → exact bit count, one entry per distinct layout.
+_CHARS_TO_BITS: dict[int, int] = {
+    _n_chars(12 + n_periods * n_models * Period.BITS): 12 + n_periods * n_models * Period.BITS
+    for n_periods, n_models in [(10, 2), (5, 3), (20, 1)]
+}
+# {94: 612, 124: 812}
+
+
 # ── ForecastMessage ───────────────────────────────────────────────────────────
 
 
 @dataclass
 class ForecastMessage:
     """
-    Encodes any forecast type to 167 printable ASCII chars.
+    Encodes any forecast type to a variable-length base-94 ASCII string.
 
     Within each time slot, models are interleaved in TYPE_MODELS order.
     """
@@ -275,7 +279,10 @@ class ForecastMessage:
 
     @staticmethod
     def decode(s: str) -> "ForecastMessage":
-        b = decode(s)
+        n_bits = _CHARS_TO_BITS.get(len(s))
+        if n_bits is None:
+            raise ValueError(f"Unexpected message length: {len(s)} chars")
+        b = decode(s, n_bits)
         t, pos = _take(b, 0, 3)
         month, pos = _take(b, pos, 4)
         day, pos = _take(b, pos, 5)
@@ -340,7 +347,7 @@ if __name__ == "__main__":
     decoded = ForecastMessage.decode(encoded)
 
     print(f"Type: {decoded.forecast_type.name}")
-    print(f"Encoded ({len(encoded)}/{_MSG_CHARS} chars): {encoded}")
+    print(f"Encoded ({len(encoded)} chars): {encoded}")
     print(f"Start: {decoded.start_date}")
     for m_idx, m_name in enumerate(TYPE_MODELS[ForecastType.DAY10_DAILY_2M]):
         p = decoded.periods[m_idx][0]

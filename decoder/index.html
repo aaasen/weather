@@ -333,21 +333,19 @@
     const A2I = Object.fromEntries([...ALPHABET].map((c, i) => [c, i]));
     const WMO_CODES = [0,1,2,3,45,48,51,53,55,56,57,61,63,65,66,67,71,73,75,77,80,81,82,85,86,95,96,99];
     const CARDINALS = ['N','NE','E','SE','S','SW','W','NW'];
-    const MSG_CHARS = 167;
-    const MSG_BITS  = 1092;
+    // Maps message length in chars → exact bit count.
+    const CHARS_TO_BITS = {94: 612, 124: 812};
 
     function safeToBits(s) {
-      let value = 0n, count = 0;
+      const nBits = CHARS_TO_BITS[s.length];
+      if (!nBits) return null;
+      let value = 0n;
       for (const c of s) {
         const idx = A2I[c];
-        if (idx !== undefined) {
-          value = value * 94n + BigInt(idx);
-          if (++count === MSG_CHARS) break;
-        }
+        if (idx !== undefined) value = value * 94n + BigInt(idx);
       }
-      if (count < MSG_CHARS) return null;
-      const bits = new Array(MSG_BITS).fill(0);
-      for (let i = MSG_BITS - 1; i >= 0; i--) {
+      const bits = new Array(nBits).fill(0);
+      for (let i = nBits - 1; i >= 0; i--) {
         bits[i] = Number(value & 1n);
         value >>= 1n;
       }
