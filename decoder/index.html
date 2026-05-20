@@ -640,25 +640,13 @@
                 ICON: "#c06010",
             };
 
-            // ── Type metadata (must match encoding.py) ────────────────────────────────
-            const TYPE_MODELS = [
-                ["ECMWF", "GFS"],
-                ["ECMWF", "GFS", "ICON"],
-                ["ECMWF"],
-                ["ECMWF"],
-                ["ECMWF", "GFS"],
-            ];
-            const TYPE_LABEL = [
-                "10-day daily · ECMWF + GFS",
-                "5-day daily · ECMWF + GFS + ICON",
-                "Today hourly · ECMWF",
-                "5-day 6-hourly · ECMWF",
-                "5-day 12-hourly · ECMWF + GFS",
-            ];
-            const TYPE_N_PERIODS = [10, 5, 20, 20, 10];
-            const TYPE_IS_FULL = [true, true, true, true, true];
-            const TYPE_HAS_SNOW = [true, true, true, true, true];
-            const TYPE_TIME_STEP = [24, 24, 1, 6, 12]; // hours between periods
+            // ── Protocol constants (must match encoding.py) ───────────────────────────
+            const VERSION = 1;
+            const HEADER_BITS = 32;
+            const PERIOD_BITS = 40;
+            const RESOLUTION_HOURS = [24, 12, 6, 3, 1];
+            const LOCATION_NAMES = ["Upper mountain", "Airstrip"];
+            const MODEL_NAMES_ALL = ["ECMWF", "GFS", "ICON"];
 
             // ── Printable ASCII base-94 decoder ──────────────────────────────────────
             const ALPHABET =
@@ -670,11 +658,20 @@
                 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99,
             ];
             const CARDINALS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
-            // Maps message length in chars → exact bit count.
-            const CHARS_TO_BITS = { 94: 612, 124: 812 };
+
+            // Valid n_bits = HEADER_BITS + k × PERIOD_BITS; injective because PERIOD_BITS > log2(94).
+            function bitsFromChars(nChars) {
+                for (let k = 0; k < 1000; k++) {
+                    const nBits = HEADER_BITS + k * PERIOD_BITS;
+                    const nc = Math.ceil((nBits * Math.log(2)) / LOG94);
+                    if (nc === nChars) return nBits;
+                    if (nc > nChars) break;
+                }
+                return null;
+            }
 
             function safeToBits(s) {
-                const nBits = CHARS_TO_BITS[s.length];
+                const nBits = bitsFromChars(s.length);
                 if (!nBits) return null;
                 let value = 0n;
                 for (const c of s) {
@@ -727,107 +724,57 @@
                 };
             }
 
-            function decodeSubPeriod(bits, pos) {
-                let wc, pr, fz, cl, w;
-                [wc, pos] = readInt(bits, pos, 5);
-                [pr, pos] = readInt(bits, pos, 4);
-                [fz, pos] = readInt(bits, pos, 4);
-                [cl, pos] = readInt(bits, pos, 4);
-                [w, pos] = readWinds(bits, pos);
-                return {
-                    pos,
-                    wc: WMO_CODES[wc] ?? 0,
-                    precip: pr * 10,
-                    fz_ft: fz * 1000,
-                    cloud: cl * 10,
-                    p500: w[0],
-                    p600: w[1],
-                    p700: w[2],
-                };
-            }
-
-            function decodeCompactPeriod(bits, pos) {
-                let wc, pr, w;
-                [wc, pos] = readInt(bits, pos, 5);
-                [pr, pos] = readInt(bits, pos, 4);
-                [w, pos] = readWinds(bits, pos);
-                return {
-                    pos,
-                    wc: WMO_CODES[wc] ?? 0,
-                    precip: pr * 10,
-                    p500: w[0],
-                    p600: w[1],
-                    p700: w[2],
-                };
-            }
-
             // ── Parse ─────────────────────────────────────────────────────────────────
             function parse(text) {
                 const bits = safeToBits(text);
                 if (!bits) return null;
 
-                let [t, pos] = readInt(bits, 0, 3);
-                let [month, p2] = readInt(bits, pos, 4);
-                pos = p2;
-                let [day, p3] = readInt(bits, pos, 5);
-                pos = p3;
+                let pos = 0;
+                let version, location, daysRaw, resolution, modelsMask, month, day, hour;
+                [version, pos] = readInt(bits, pos, 7);
+                [location, pos] = readInt(bits, pos, 1);
+                [daysRaw, pos] = readInt(bits, pos, 4);
+                const days = daysRaw + 1;
+                [resolution, pos] = readInt(bits, pos, 3);
+                [modelsMask, pos] = readInt(bits, pos, 3);
+                [month, pos] = readInt(bits, pos, 4);
+                [day, pos] = readInt(bits, pos, 5);
+                [hour, pos] = readInt(bits, pos, 5);
 
-                if (t > 4 || month < 1 || month > 12 || day < 1 || day > 31)
+                if (version !== VERSION)
+                    return { versionMismatch: true, encodedVersion: version };
+                if (!modelsMask || resolution > 4 || month < 1 || month > 12 || day < 1 || day > 31)
                     return null;
 
-                const models = TYPE_MODELS[t];
-                const nPeriods = TYPE_N_PERIODS[t];
-                const isFull = TYPE_IS_FULL[t];
-                const hasSnow = TYPE_HAS_SNOW[t];
-                const timeStep = TYPE_TIME_STEP[t];
-                const decodePrimary = isFull
-                    ? decodeFullPeriod
-                    : decodeSubPeriod;
+                const models = MODEL_NAMES_ALL.filter((_, i) => modelsMask & (1 << i));
+                const resHours = RESOLUTION_HOURS[resolution];
+                const periodsPerDay = resHours >= 24 ? 1 : 24 / resHours;
+                const nPeriods = days * periodsPerDay;
+                const daily = resHours >= 24;
 
                 const today = new Date();
-                const start = new Date(today.getFullYear(), month - 1, day);
+                const start = new Date(today.getFullYear(), month - 1, day, hour);
                 if ((today - start) / 86400000 > 180)
                     start.setFullYear(start.getFullYear() + 1);
+                const stepMs = resHours * 3600000;
 
-                // Base time: noon for daily, midnight for sub-daily
-                const baseMs =
-                    timeStep >= 24
-                        ? new Date(
-                              start.getFullYear(),
-                              start.getMonth(),
-                              start.getDate(),
-                              12,
-                          ).getTime()
-                        : new Date(
-                              start.getFullYear(),
-                              start.getMonth(),
-                              start.getDate(),
-                              0,
-                          ).getTime();
-                const stepMs = timeStep * 3600000;
-
-                const allPeriods = Array.from(
-                    { length: models.length },
-                    () => [],
-                );
-
+                const allPeriods = Array.from({ length: models.length }, () => []);
                 for (let i = 0; i < nPeriods; i++) {
-                    const date = new Date(baseMs + i * stepMs);
+                    const date = new Date(start.getTime() + i * stepMs);
                     for (let m = 0; m < models.length; m++) {
-                        const p = decodePrimary(bits, pos);
+                        const p = decodeFullPeriod(bits, pos);
                         pos = p.pos;
                         allPeriods[m].push({ ...p, date });
                     }
                 }
 
-                const snowUnit = timeStep >= 24 ? 1 : 0.1;
+                const resLabel = resHours >= 24 ? "daily" : `${resHours}h`;
                 return {
-                    type: t,
-                    label: TYPE_LABEL[t],
+                    label: `${LOCATION_NAMES[location]} · ${days}d ${resLabel} · ${models.join(" + ")}`,
                     models,
-                    hasSnow,
-                    timeStep,
-                    snowUnit,
+                    hasSnow: true,
+                    timeStep: resHours,
+                    snowUnit: daily ? 1 : 0.1,
                     periods: allPeriods,
                 };
             }
@@ -1021,12 +968,17 @@
             const output = document.getElementById("output");
 
             input.addEventListener("input", () => {
-                const result = parse(input.value.replace(/\s/g, ""));
-                output.innerHTML = result
-                    ? render(result)
-                    : input.value.trim()
-                      ? '<p class="empty">Could not decode forecast.</p>'
-                      : "";
+                const text = input.value.replace(/\s/g, "");
+                const result = parse(text);
+                if (!result) {
+                    output.innerHTML = input.value.trim()
+                        ? '<p class="empty">Could not decode forecast.</p>'
+                        : "";
+                } else if (result.versionMismatch) {
+                    output.innerHTML = `<p class="empty" style="color:#c03030">Version mismatch: message used protocol v${result.encodedVersion}, decoder expects v${VERSION}. Request a new forecast.</p>`;
+                } else {
+                    output.innerHTML = render(result);
+                }
             });
 
             // ── Forecast builder ──────────────────────────────────────────────────────
@@ -1035,7 +987,7 @@
 
             function builderChars(days, resHours, nModels) {
                 const periodsPerDay = resHours >= 24 ? 1 : 24 / resHours;
-                const nBits = 12 + days * periodsPerDay * nModels * 40;
+                const nBits = HEADER_BITS + days * periodsPerDay * nModels * PERIOD_BITS;
                 return Math.ceil((nBits * Math.log(2)) / LOG94);
             }
 

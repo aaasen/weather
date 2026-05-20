@@ -6,7 +6,7 @@ import traceback
 import requests
 from flask import Flask, request, send_from_directory, Response
 
-from forecast import fetch_forecast, parse_keyword
+from forecast import fetch_forecast, parse_request
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -49,11 +49,11 @@ def inbound():
 
     if reply_url:
         body = text.replace(reply_url, "").strip()
-        keyword = parse_keyword(body)
-        logger.info("forecast type keyword: %r", keyword)
+        params = parse_request(body)
+        logger.info("forecast request params: %r", params)
         try:
-            encoded = fetch_forecast(keyword)
-            logger.info("forecast fetched (keyword=%r, len=%d): %s", keyword, len(encoded), encoded)
+            encoded = fetch_forecast(**params)
+            logger.info("forecast fetched (params=%r, len=%d): %s", params, len(encoded), encoded)
         except Exception:
             logger.error("fetch_forecast failed:\n%s", traceback.format_exc())
             return "OK", 200

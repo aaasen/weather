@@ -3,17 +3,46 @@ import datetime
 import requests
 
 from encoding import (
-    OPENMETEO_MODELS,
-    TYPE_KEYWORDS,
-    TYPE_MODELS,
+    VERSION,
+    RESOLUTION_HOURS,
+    MODEL_BIT,
     ForecastMessage,
-    ForecastType,
     Period,
 )
 
-FORECAST_LAT = 63.0692
-FORECAST_LON = -151.0070
-FORECAST_TZ = "America/Anchorage"
+OPENMETEO_MODELS: dict[str, str] = {
+    "ECMWF": "ecmwf_ifs025",
+    "GFS": "gfs_seamless",
+    "ICON": "icon_seamless",
+}
+
+LOCATION_COORDS: dict[str, tuple[float, float, str]] = {
+    "upper": (63.0692, -151.0070, "America/Anchorage"),
+    "airstrip": (62.900, -151.093, "America/Anchorage"),
+}
+
+# resolution index → hours to request from API (None = use noon daily rows)
+RESOLUTION_TARGET_HOURS: dict[int, list[int] | None] = {
+    0: None,
+    1: [0, 12],
+    2: [0, 6, 12, 18],
+    3: [0, 3, 6, 9, 12, 15, 18, 21],
+    4: list(range(24)),
+}
+
+_RESOLUTION_LABEL_TO_IDX: dict[str, int] = {
+    "daily": 0, "24h": 0,
+    "12h": 1,
+    "6h": 2,
+    "3h": 3,
+    "1h": 4,
+}
+
+_MODEL_NAME_TO_BIT: dict[str, int] = {
+    "ecmwf": MODEL_BIT["ECMWF"], "euro": MODEL_BIT["ECMWF"],
+    "gfs": MODEL_BIT["GFS"],
+    "icon": MODEL_BIT["ICON"],
+}
 
 _SURFACE_VARS = [
     "wind_speed_10m",
@@ -42,18 +71,18 @@ def _round5(v: float | None) -> int:
 # ── API fetch helpers ─────────────────────────────────────────────────────────
 
 
-def _fetch_hourly(model_key: str, n_days: int) -> tuple[dict, list[str]]:
-    """Fetch raw hourly data for one model. Returns (hourly_vars, times)."""
+def _fetch_hourly(
+    model_key: str, n_days: int, lat: float, lon: float, tz: str
+) -> tuple[dict, list[str]]:
     pressure_vars = [
         f"{v}_{l}hPa" for v in _PRESSURE_VAR_NAMES for l in _PRESSURE_LEVELS
     ]
-
     params = {
-        "latitude": FORECAST_LAT,
-        "longitude": FORECAST_LON,
+        "latitude": lat,
+        "longitude": lon,
         "hourly": ",".join(_SURFACE_VARS + pressure_vars),
         "wind_speed_unit": "mph",
-        "timezone": FORECAST_TZ,
+        "timezone": tz,
         "forecast_days": n_days,
         "models": OPENMETEO_MODELS[model_key],
     }
@@ -80,16 +109,16 @@ def _build_row(h: dict, times: list[str], idx: int, snow_cm: float = 0.0) -> dic
     return row
 
 
-def _noon_rows(model_key: str, n_days: int) -> list[dict]:
+def _noon_rows(
+    model_key: str, n_days: int, lat: float, lon: float, tz: str
+) -> list[dict]:
     """One row per day at noon local time, with cumulative daily snow."""
-    h, times = _fetch_hourly(model_key, n_days)
-
+    h, times = _fetch_hourly(model_key, n_days, lat, lon, tz)
     snow_arr = h.get("snowfall", [])
     daily_snow: dict[str, float] = {}
     for i, t in enumerate(times):
         date = t[:10]
         daily_snow[date] = daily_snow.get(date, 0.0) + (snow_arr[i] or 0.0)
-
     rows = []
     for i, t in enumerate(times):
         if t.endswith("T12:00") and len(rows) < n_days:
@@ -97,9 +126,16 @@ def _noon_rows(model_key: str, n_days: int) -> list[dict]:
     return rows
 
 
-def _hour_rows(model_key: str, n_days: int, target_hours: list[int]) -> list[dict]:
+def _hour_rows(
+    model_key: str,
+    n_days: int,
+    target_hours: list[int],
+    lat: float,
+    lon: float,
+    tz: str,
+) -> list[dict]:
     """Rows at specific hours across n_days."""
-    h, times = _fetch_hourly(model_key, n_days)
+    h, times = _fetch_hourly(model_key, n_days, lat, lon, tz)
     snow_arr = h.get("snowfall", [])
     n_total = n_days * len(target_hours)
     rows = []
@@ -112,7 +148,7 @@ def _hour_rows(model_key: str, n_days: int, target_hours: list[int]) -> list[dic
     return rows
 
 
-# ── Row → period converters ───────────────────────────────────────────────────
+# ── Row → Period ──────────────────────────────────────────────────────────────
 
 
 def _to_full(r: dict, daily: bool = True) -> Period:
@@ -134,129 +170,114 @@ def _to_full(r: dict, daily: bool = True) -> Period:
     )
 
 
-def _make_message(
-    ft: ForecastType, rows_per_model: list[list[dict]], daily: bool
+# ── Request parser ────────────────────────────────────────────────────────────
+
+
+def parse_request(body: str) -> dict:
+    """Parse 'upper 10d daily ecmwf,gfs' into fetch_forecast kwargs."""
+    words = body.lower().strip().split()
+
+    location_idx = 0
+    days = 10
+    resolution_idx = 0
+    models_mask = 1  # ECMWF default
+
+    for word in words:
+        if word == "upper":
+            location_idx = 0
+        elif word == "airstrip":
+            location_idx = 1
+        elif word.endswith("d") and word[:-1].isdigit():
+            days = max(1, min(10, int(word[:-1])))
+        elif word in _RESOLUTION_LABEL_TO_IDX:
+            resolution_idx = _RESOLUTION_LABEL_TO_IDX[word]
+        else:
+            model_parts = word.split(",")
+            if any(m in _MODEL_NAME_TO_BIT for m in model_parts):
+                mask = 0
+                for m in model_parts:
+                    if m in _MODEL_NAME_TO_BIT:
+                        mask |= 1 << _MODEL_NAME_TO_BIT[m]
+                if mask:
+                    models_mask = mask
+
+    return {
+        "location_idx": location_idx,
+        "days": days,
+        "resolution_idx": resolution_idx,
+        "models_mask": models_mask,
+    }
+
+
+# ── Forecast fetch ────────────────────────────────────────────────────────────
+
+
+def fetch_forecast(
+    location_idx: int = 0,
+    days: int = 10,
+    resolution_idx: int = 0,
+    models_mask: int = 1,
 ) -> str:
-    start = datetime.date.fromisoformat(rows_per_model[0][0]["time"][:10])
+    location_name = list(LOCATION_COORDS.keys())[location_idx]
+    lat, lon, tz = LOCATION_COORDS[location_name]
+
+    model_keys = [
+        key
+        for key, bit in [("ECMWF", 0), ("GFS", 1), ("ICON", 2)]
+        if models_mask & (1 << bit)
+    ] or ["ECMWF"]
+
+    target_hours = RESOLUTION_TARGET_HOURS[resolution_idx]
+    daily = resolution_idx == 0
+
+    if daily:
+        rows_per_model = [_noon_rows(m, days, lat, lon, tz) for m in model_keys]
+    else:
+        rows_per_model = [_hour_rows(m, days, target_hours, lat, lon, tz) for m in model_keys]
+
+    first_time = rows_per_model[0][0]["time"]
+    start_date = datetime.date.fromisoformat(first_time[:10])
+    start_hour = int(first_time[11:13])
+
     return ForecastMessage(
-        type=int(ft),
-        month=start.month,
-        day=start.day,
+        version=VERSION,
+        location=location_idx,
+        days=days,
+        resolution=resolution_idx,
+        models_mask=models_mask,
+        month=start_date.month,
+        day=start_date.day,
+        hour=start_hour,
         periods=[[_to_full(r, daily=daily) for r in rows] for rows in rows_per_model],
     ).encode()
-
-
-# ── Per-type fetch functions ──────────────────────────────────────────────────
-
-
-def fetch_type0() -> str:
-    """10-day daily, 2 models (ECMWF + GFS)."""
-    models = TYPE_MODELS[ForecastType.DAY10_DAILY_2M]
-    return _make_message(
-        ForecastType.DAY10_DAILY_2M,
-        [_noon_rows(m, 10) for m in models],
-        daily=True,
-    )
-
-
-def fetch_type1() -> str:
-    """5-day daily, 4 models."""
-    models = TYPE_MODELS[ForecastType.DAY5_DAILY_3M]
-    return _make_message(
-        ForecastType.DAY5_DAILY_3M,
-        [_noon_rows(m, 5) for m in models],
-        daily=True,
-    )
-
-
-def fetch_type2() -> str:
-    """1-day hourly, 1 model (ECMWF)."""
-    models = TYPE_MODELS[ForecastType.DAY1_HOURLY_1M]
-    return _make_message(
-        ForecastType.DAY1_HOURLY_1M,
-        [_hour_rows(models[0], 1, list(range(20)))],
-        daily=False,
-    )
-
-
-def fetch_type3() -> str:
-    """5-day 6-hourly, 1 model (ECMWF)."""
-    models = TYPE_MODELS[ForecastType.DAY5_6H_1M]
-    return _make_message(
-        ForecastType.DAY5_6H_1M,
-        [_hour_rows(models[0], 5, [0, 6, 12, 18])],
-        daily=False,
-    )
-
-
-def fetch_type4() -> str:
-    """5-day 12-hourly, 2 models (ECMWF + GFS)."""
-    models = TYPE_MODELS[ForecastType.DAY5_12H_2M]
-    return _make_message(
-        ForecastType.DAY5_12H_2M,
-        [_hour_rows(m, 5, [0, 12]) for m in models],
-        daily=False,
-    )
-
-
-_FETCH_FN = {
-    ForecastType.DAY10_DAILY_2M: fetch_type0,
-    ForecastType.DAY5_DAILY_3M: fetch_type1,
-    ForecastType.DAY1_HOURLY_1M: fetch_type2,
-    ForecastType.DAY5_6H_1M: fetch_type3,
-    ForecastType.DAY5_12H_2M: fetch_type4,
-}
-
-
-def parse_keyword(body: str) -> str:
-    """Return the first recognised type keyword from a message body."""
-    for word in body.lower().split():
-        if word in TYPE_KEYWORDS:
-            return word
-    return "10d"
-
-
-def fetch_forecast(keyword: str = "10d") -> str:
-    """Fetch and encode a forecast for the given type keyword."""
-    ft = TYPE_KEYWORDS.get(keyword.lower().strip(), ForecastType.DAY10_DAILY_2M)
-    return _FETCH_FN[ft]()
 
 
 # ── __main__ ──────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    from encoding import CARDINALS, TYPE_LABEL, ForecastMessage
+    from encoding import CARDINALS, LOCATIONS, RESOLUTION_LABEL, models_from_mask
 
-    for keyword, ft in [
-        ("10d", ForecastType.DAY10_DAILY_2M),
-        ("5d", ForecastType.DAY5_DAILY_3M),
-        ("1d", ForecastType.DAY1_HOURLY_1M),
-        ("6h", ForecastType.DAY5_6H_1M),
-        ("12h", ForecastType.DAY5_12H_2M),
-    ]:
+    test_requests = [
+        "upper 10d daily ecmwf",
+        "upper 5d 6h ecmwf,gfs",
+        "airstrip 3d 12h ecmwf,gfs",
+    ]
+    for req_str in test_requests:
         print(f"\n{'=' * 60}")
-        print(f"Type {int(ft)}: {TYPE_LABEL[ft]}  (keyword: {keyword!r})")
-        encoded = fetch_forecast(keyword)
+        print(f"Request: {req_str!r}")
+        params = parse_request(req_str)
+        encoded = fetch_forecast(**params)
         decoded = ForecastMessage.decode(encoded)
-        models = TYPE_MODELS[ft]
+        loc = LOCATIONS[decoded.location]
+        res = RESOLUTION_LABEL[decoded.resolution]
+        mods = models_from_mask(decoded.models_mask)
         print(f"Encoded ({len(encoded)} chars): {encoded}")
-        print(f"Start date: {decoded.start_date}  periods: {len(decoded.periods[0])}")
-        for m_idx, m_name in enumerate(models):
-            p0 = decoded.periods[m_idx][0]
-            if hasattr(p0, "snow_in"):
-                print(
-                    f"  {m_name} period 0: wc={p0.weathercode} precip={p0.precip}% "
-                    f"freeze={p0.freeze_ft}ft snow={p0.snow_in}in cloud={p0.cloud_mid}% "
-                    f"700={p0.wind_700_mph}mph {CARDINALS[p0.wind_700_dir]}"
-                )
-            elif hasattr(p0, "cloud_mid"):
-                print(
-                    f"  {m_name} period 0: wc={p0.weathercode} precip={p0.precip}% "
-                    f"freeze={p0.freeze_ft}ft cloud={p0.cloud_mid}% "
-                    f"700={p0.wind_700_mph}mph {CARDINALS[p0.wind_700_dir]}"
-                )
-            else:
-                print(
-                    f"  {m_name} period 0: wc={p0.weathercode} precip={p0.precip}% "
-                    f"700={p0.wind_700_mph}mph {CARDINALS[p0.wind_700_dir]}"
-                )
+        print(f"Location: {loc}, Days: {decoded.days}, Res: {res}, Models: {mods}")
+        print(f"Start: {decoded.start_datetime}")
+        for m_idx, m_name in enumerate(mods):
+            p = decoded.periods[m_idx][0]
+            print(
+                f"  {m_name} period 0: wc={p.weathercode} precip={p.precip}% "
+                f"freeze={p.freeze_ft}ft snow={p.snow_in}in cloud={p.cloud_mid}% "
+                f"700={p.wind_700_mph}mph {CARDINALS[p.wind_700_dir]}"
+            )

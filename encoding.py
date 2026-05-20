@@ -1,40 +1,34 @@
 """
 Binary forecast encoding using 94 printable ASCII characters 33–126 (! through ~) as a base-94 alphabet.
 
-Common header (12 bits):
-  3  type   — forecast type 0-4
-  4  month  — 1-12
-  5  day    — 1-31
+Header (32 bits):
+  7  version    — protocol version; decoder rejects mismatches
+  1  location   — 0=upper mountain, 1=airstrip
+  4  days       — 0–9 stored → 1–10 forecast days
+  3  resolution — 0=daily, 1=12h, 2=6h, 3=3h, 4=1h
+  3  models     — bitmask: bit0=ECMWF, bit1=GFS, bit2=ICON
+  4  month      — 1–12
+  5  day        — 1–31
+  5  hour       — 0–23, start hour of first period
 
-Period (40 bits) — all types and models:
+Period (40 bits):
   5  wc      WMO weather code; index into 28-value WMO_CODES table
   3  precip  precipitation probability 0–100 %, stored in 12.5 % steps (0–7)
   4  freeze  freezing level 0–15,000 ft, stored in 1,000 ft steps (0–15)
-  4  snow    snowfall 0–15; unit depends on type: 1"/step daily, 0.1"/step sub-daily
+  4  snow    snowfall 0–15; unit: 1"/step daily, 0.1"/step sub-daily
   3  cloud   mid-level cloud cover 0–100 %, stored in 12.5 % steps (0–7)
   7  w500    500 hPa (~18k ft) wind: 4 bits speed (0–75 mph, 5 mph steps) + 3 bits direction (8 cardinals)
   7  w600    600 hPa (~14k ft) wind: same encoding
   7  w700    700 hPa (~10k ft) wind: same encoding
 
-Type layout (header + interleaved slots):
-  0 (10d-daily-2m):  12 + 10×2×40 =  812 bits
-  1 (5d-daily-3m):   12 +  5×3×40 =  612 bits
-  2 (1d-hourly-1m):  12 + 20×1×40 =  812 bits
-  3 (5d-6h-1m):      12 + 20×1×40 =  812 bits
-  4 (5d-12h-2m):     12 + 10×2×40 =  812 bits
-
-Models per type (fixed, primary first):
-  0: ECMWF, GFS
-  1: ECMWF, GFS, ICON
-  2: ECMWF
-  3: ECMWF
-  4: ECMWF, GFS
+Total bits = 32 + n_periods × n_models × 40
+  where n_periods = days × (24 / resolution_hours)  [1 for daily]
+  and   n_models  = popcount(models bitmask)
 """
 
 import datetime
 import math
 from dataclasses import dataclass
-from enum import IntEnum
 from typing import Any, ClassVar
 
 from bitarray import bitarray
@@ -43,11 +37,11 @@ from pydantic import BaseModel
 
 # ── Alphabet ──────────────────────────────────────────────────────────────────
 
-# Printable ASCII 33–126 (! through ~) — 94 chars.
 ALPHABET = "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
 assert len(ALPHABET) == 94
 assert len(set(ALPHABET)) == 94
 _A2I = {c: i for i, c in enumerate(ALPHABET)}
+
 
 def _n_chars(n_bits: int) -> int:
     return math.ceil(n_bits * math.log(2) / math.log(94))
@@ -74,81 +68,37 @@ def decode(s: str, n_bits: int) -> bitarray:
     return int2ba(value, length=n_bits)
 
 
-# ── Type / model registry ─────────────────────────────────────────────────────
+# ── Protocol constants ────────────────────────────────────────────────────────
+
+VERSION = 1
+HEADER_BITS = 32
+PERIOD_BITS = 40
+
+LOCATIONS: list[str] = ["upper", "airstrip"]
+
+# resolution index → hours between periods
+RESOLUTION_HOURS: dict[int, int] = {0: 24, 1: 12, 2: 6, 3: 3, 4: 1}
+RESOLUTION_LABEL: dict[int, str] = {0: "daily", 1: "12h", 2: "6h", 3: "3h", 4: "1h"}
+
+# model name → bit position in the 3-bit bitmask
+MODEL_BIT: dict[str, int] = {"ECMWF": 0, "GFS": 1, "ICON": 2}
+MODEL_NAMES: list[str] = ["ECMWF", "GFS", "ICON"]  # index = bit position
 
 
-class ForecastType(IntEnum):
-    DAY10_DAILY_2M = 0
-    DAY5_DAILY_3M = 1
-    DAY1_HOURLY_1M = 2
-    DAY5_6H_1M = 3
-    DAY5_12H_2M = 4
+def models_from_mask(mask: int) -> list[str]:
+    return [name for name in MODEL_NAMES if mask & (1 << MODEL_BIT[name])]
 
 
-OPENMETEO_MODELS: dict[str, str] = {
-    "ECMWF": "ecmwf_ifs025",
-    "GFS": "gfs_seamless",
-    "ICON": "icon_seamless",
-}
-
-TYPE_MODELS: dict[ForecastType, list[str]] = {
-    ForecastType.DAY10_DAILY_2M: ["ECMWF", "GFS"],
-    ForecastType.DAY5_DAILY_3M: ["ECMWF", "GFS", "ICON"],
-    ForecastType.DAY1_HOURLY_1M: ["ECMWF"],
-    ForecastType.DAY5_6H_1M: ["ECMWF"],
-    ForecastType.DAY5_12H_2M: ["ECMWF", "GFS"],
-}
-
-TYPE_LABEL: dict[ForecastType, str] = {
-    ForecastType.DAY10_DAILY_2M: "10-day daily · ECMWF + GFS",
-    ForecastType.DAY5_DAILY_3M: "5-day daily · ECMWF + GFS + ICON",
-    ForecastType.DAY1_HOURLY_1M: "Today hourly · ECMWF",
-    ForecastType.DAY5_6H_1M: "5-day 6-hourly · ECMWF",
-    ForecastType.DAY5_12H_2M: "5-day 12-hourly · ECMWF + GFS",
-}
-
-TYPE_KEYWORDS: dict[str, ForecastType] = {
-    "10d": ForecastType.DAY10_DAILY_2M,
-    "5d": ForecastType.DAY5_DAILY_3M,
-    "1d": ForecastType.DAY1_HOURLY_1M,
-    "now": ForecastType.DAY1_HOURLY_1M,
-    "today": ForecastType.DAY1_HOURLY_1M,
-    "6h": ForecastType.DAY5_6H_1M,
-    "12h": ForecastType.DAY5_12H_2M,
-}
+def mask_from_models(models: list[str]) -> int:
+    return sum(1 << MODEL_BIT[m.upper()] for m in models if m.upper() in MODEL_BIT)
 
 
 # ── Shared constants ──────────────────────────────────────────────────────────
 
 WMO_CODES: list[int] = [
-    0,
-    1,
-    2,
-    3,
-    45,
-    48,
-    51,
-    53,
-    55,
-    56,
-    57,
-    61,
-    63,
-    65,
-    66,
-    67,
-    71,
-    73,
-    75,
-    77,
-    80,
-    81,
-    82,
-    85,
-    86,
-    95,
-    96,
-    99,
+    0, 1, 2, 3, 45, 48, 51, 53, 55, 56, 57,
+    61, 63, 65, 66, 67, 71, 73, 75, 77, 80,
+    81, 82, 85, 86, 95, 96, 99,
 ]
 _WMO2IDX = {c: i for i, c in enumerate(WMO_CODES)}
 
@@ -186,7 +136,7 @@ def _take_winds(b: bitarray, pos: int) -> tuple[list[tuple[int, int]], int]:
 
 
 class Period(BaseModel):
-    """40 bits — one forecast period for any type/model."""
+    """40 bits — one forecast period."""
 
     BITS: ClassVar[int] = 40
     weathercode: int
@@ -240,12 +190,23 @@ class Period(BaseModel):
         ), pos
 
 
-# Maps encoded message length (chars) → exact bit count, one entry per distinct layout.
-_CHARS_TO_BITS: dict[int, int] = {
-    _n_chars(12 + n_periods * n_models * Period.BITS): 12 + n_periods * n_models * Period.BITS
-    for n_periods, n_models in [(10, 2), (5, 3), (20, 1)]
-}
-# {94: 612, 124: 812}
+# ── Char → bit count ──────────────────────────────────────────────────────────
+
+
+def _bits_from_chars(n_chars: int) -> int | None:
+    """Return the unique valid n_bits for a given encoded char count, or None.
+
+    Valid n_bits = HEADER_BITS + k × PERIOD_BITS for k ≥ 0.
+    Since PERIOD_BITS (40) > log2(94) (~6.55), the char→bit mapping is injective.
+    """
+    for k in range(1000):
+        n_bits = HEADER_BITS + k * PERIOD_BITS
+        nc = _n_chars(n_bits)
+        if nc == n_chars:
+            return n_bits
+        if nc > n_chars:
+            break
+    return None
 
 
 # ── ForecastMessage ───────────────────────────────────────────────────────────
@@ -253,22 +214,28 @@ _CHARS_TO_BITS: dict[int, int] = {
 
 @dataclass
 class ForecastMessage:
-    """
-    Encodes any forecast type to a variable-length base-94 ASCII string.
+    """Encodes a configurable forecast to a variable-length base-94 ASCII string."""
 
-    Within each time slot, models are interleaved in TYPE_MODELS order.
-    """
-
-    type: int
-    month: int
-    day: int
-    periods: list[list[Any]]  # periods[model_idx][period_idx]
+    version: int
+    location: int      # index into LOCATIONS
+    days: int          # 1–10
+    resolution: int    # index into RESOLUTION_HOURS
+    models_mask: int   # 3-bit bitmask: bit0=ECMWF, bit1=GFS, bit2=ICON
+    month: int         # 1–12
+    day: int           # 1–31
+    hour: int          # 0–23, start hour of first period
+    periods: list[list[Any]]  # [model_idx][period_idx]
 
     def to_bits(self) -> bitarray:
         b = bitarray()
-        _put(b, self.type, 3)
+        _put(b, self.version, 7)
+        _put(b, self.location, 1)
+        _put(b, self.days - 1, 4)   # store 0-indexed (0–9 → days 1–10)
+        _put(b, self.resolution, 3)
+        _put(b, self.models_mask, 3)
         _put(b, self.month, 4)
         _put(b, self.day, 5)
+        _put(b, self.hour, 5)
         for i in range(len(self.periods[0])):
             for model_periods in self.periods:
                 b.extend(model_periods[i].to_bits())
@@ -279,80 +246,91 @@ class ForecastMessage:
 
     @staticmethod
     def decode(s: str) -> "ForecastMessage":
-        n_bits = _CHARS_TO_BITS.get(len(s))
+        n_bits = _bits_from_chars(len(s))
         if n_bits is None:
             raise ValueError(f"Unexpected message length: {len(s)} chars")
         b = decode(s, n_bits)
-        t, pos = _take(b, 0, 3)
+        pos = 0
+
+        version, pos = _take(b, pos, 7)
+        location, pos = _take(b, pos, 1)
+        days_raw, pos = _take(b, pos, 4)
+        days = days_raw + 1
+        resolution, pos = _take(b, pos, 3)
+        models_mask, pos = _take(b, pos, 3)
         month, pos = _take(b, pos, 4)
         day, pos = _take(b, pos, 5)
+        hour, pos = _take(b, pos, 5)
 
-        if t not in range(5):
-            raise ValueError(f"Unknown forecast type: {t}")
-        ft = ForecastType(t)
+        if version != VERSION:
+            raise ValueError(f"Version mismatch: encoded v{version}, expected v{VERSION}")
 
-        n_periods = {
-            ForecastType.DAY10_DAILY_2M: 10,
-            ForecastType.DAY5_DAILY_3M: 5,
-            ForecastType.DAY1_HOURLY_1M: 20,
-            ForecastType.DAY5_6H_1M: 20,
-            ForecastType.DAY5_12H_2M: 10,
-        }[ft]
+        res_hours = RESOLUTION_HOURS.get(resolution, 24)
+        periods_per_day = 1 if res_hours >= 24 else 24 // res_hours
+        n_periods = days * periods_per_day
+        n_models = bin(models_mask).count("1")
 
-        n_models = len(TYPE_MODELS[ft])
         all_periods: list[list[Any]] = [[] for _ in range(n_models)]
-
         for _ in range(n_periods):
             for m in range(n_models):
                 p, pos = Period.from_bits(b, pos)
                 all_periods[m].append(p)
 
-        return ForecastMessage(type=t, month=month, day=day, periods=all_periods)
+        return ForecastMessage(
+            version=version,
+            location=location,
+            days=days,
+            resolution=resolution,
+            models_mask=models_mask,
+            month=month,
+            day=day,
+            hour=hour,
+            periods=all_periods,
+        )
 
     @property
-    def forecast_type(self) -> ForecastType:
-        return ForecastType(self.type)
-
-    @property
-    def start_date(self) -> datetime.date:
+    def start_datetime(self) -> datetime.datetime:
         year = datetime.date.today().year
-        d = datetime.date(year, self.month, self.day)
-        if (datetime.date.today() - d).days > 180:
-            d = datetime.date(year + 1, self.month, self.day)
+        d = datetime.datetime(year, self.month, self.day, self.hour)
+        if (datetime.datetime.now() - d) > datetime.timedelta(days=180):
+            d = d.replace(year=year + 1)
         return d
 
 
 if __name__ == "__main__":
     sample = Period(
         weathercode=73,
-        precip=100,
-        freeze_ft=5500,
+        precip=75,
+        freeze_ft=6000,
         snow_in=4,
-        cloud_mid=80,
+        cloud_mid=75,
         wind_500_mph=30,
         wind_500_dir=4,
         wind_600_mph=25,
         wind_600_dir=4,
-        wind_700_mph=10,
+        wind_700_mph=15,
         wind_700_dir=4,
     )
-
     msg = ForecastMessage(
-        type=int(ForecastType.DAY10_DAILY_2M),
+        version=VERSION,
+        location=0,
+        days=10,
+        resolution=0,
+        models_mask=0b011,  # ECMWF + GFS
         month=5,
-        day=19,
+        day=20,
+        hour=12,
         periods=[[sample] * 10, [sample] * 10],
     )
     encoded = msg.encode()
     decoded = ForecastMessage.decode(encoded)
-
-    print(f"Type: {decoded.forecast_type.name}")
+    print(f"Version: {decoded.version}")
+    print(f"Location: {LOCATIONS[decoded.location]}")
+    print(f"Days: {decoded.days}, Resolution: {RESOLUTION_LABEL[decoded.resolution]}")
+    print(f"Models: {models_from_mask(decoded.models_mask)}")
     print(f"Encoded ({len(encoded)} chars): {encoded}")
-    print(f"Start: {decoded.start_date}")
-    for m_idx, m_name in enumerate(TYPE_MODELS[ForecastType.DAY10_DAILY_2M]):
-        p = decoded.periods[m_idx][0]
-        print(
-            f"Day 1 {m_name}: wc={p.weathercode} precip={p.precip}% "
-            f"freeze={p.freeze_ft}ft snow={p.snow_in}in cloud={p.cloud_mid}% "
-            f"500={p.wind_500_mph}mph {CARDINALS[p.wind_500_dir]}"
-        )
+    p0 = decoded.periods[0][0]
+    print(
+        f"Period 0 ECMWF: wc={p0.weathercode} precip={p0.precip}% "
+        f"freeze={p0.freeze_ft}ft snow={p0.snow_in}in 700={p0.wind_700_mph}mph {CARDINALS[p0.wind_700_dir]}"
+    )
