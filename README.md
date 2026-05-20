@@ -1,22 +1,8 @@
 # Satellite Weather
 
-Weather forecasts via Garmin inReach satellite messenger.
+Weather forecasts via Garmin inReach satellite messenger. Deployed at [weather.laneaasen.com](https://weather.laneaasen.com/).
 
 The goal of this project is to provide better weather forecasts than the default inReach system. Forecasts are sourced from [Open-Meteo](https://open-meteo.com/). They are encoded with a custom binary encoding to maximize information density. Using this encoding, it is possible to get 10-day daily forecasts in a single message.
-
-## Usage
-
-Send a message to `wx@email.laneaasen.com` from your inReach device. Include a forecast type keyword in the body (default: `10d`):
-
-| Keyword | Forecast |
-|---------|----------|
-| `10d` | 10-day daily · ECMWF + GFS |
-| `5d` | 5-day daily · ECMWF + GFS + ICON |
-| `1d` / `today` / `now` | Today hourly · ECMWF |
-| `6h` | 5-day 6-hourly · ECMWF |
-| `12h` | 5-day 12-hourly · ECMWF + GFS |
-
-Copy the response into the decoder app at [weather.laneaasen.com](https://weather.laneaasen.com/).
 
 ## Offline Usage
 
@@ -76,20 +62,6 @@ PORT=3000 node packages/server/dist/index.js
 
 ```bash
 pnpm test
-```
-
-No automated tests exist yet. To manually verify the protocol, run a round-trip from the Node REPL:
-
-```bash
-node --input-type=module - << 'EOF'
-import { messageToString, messageFromString } from './packages/protocol/dist/index.js';
-const msg = { version: 1, location: 0, days: 3, resolution: 0, models_mask: 1, month: 5, day: 20, hour: 12,
-  periods: [[0,0,0].map(() => ({ weathercode: 3, precip: 50, freeze_ft: 8000, snow_in: 2, cloud_mid: 75,
-    wind_500_mph: 30, wind_500_dir: 2, wind_600_mph: 20, wind_600_dir: 2, wind_700_mph: 10, wind_700_dir: 2 }))] };
-const s = messageToString(msg);
-const d = messageFromString(s);
-console.log(s, d.days === msg.days && d.periods[0][0].weathercode === 3 ? '✓' : '✗');
-EOF
 ```
 
 ### Docker
