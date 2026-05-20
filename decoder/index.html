@@ -1,849 +1,1120 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <title>Denali WX</title>
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#f5f5f5">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: #f5f5f5;
-      color: #1a1a1a;
-      font-family: system-ui, -apple-system, sans-serif;
-      font-size: 15px;
-      line-height: 1.4;
-      padding: 14px;
-      min-height: 100dvh;
-    }
-
-    header {
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-    h1 {
-      font-size: 0.72rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #999;
-    }
-    .subtitle { font-size: 0.68rem; color: #bbb; letter-spacing: 0.03em; }
-
-    textarea {
-      width: 100%;
-      background: #fff;
-      color: #1a1a1a;
-      border: 1px solid #d0d0d0;
-      border-radius: 6px;
-      padding: 10px 12px;
-      font-family: monospace;
-      font-size: 12px;
-      line-height: 1.5;
-      resize: vertical;
-      min-height: 60px;
-      outline: none;
-      margin-bottom: 14px;
-      -webkit-appearance: none;
-    }
-    textarea::placeholder { color: #bbb; }
-    textarea:focus { border-color: #999; }
-
-    .type-badge {
-      font-size: 0.68rem;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: #888;
-      margin-bottom: 8px;
-    }
-
-    .table-wrap {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      border-radius: 8px;
-      border: 1px solid #e0e0e0;
-      background: #fff;
-      margin-bottom: 20px;
-    }
-
-    table { width: 100%; border-collapse: collapse; }
-
-    th, td {
-      padding: 7px 8px;
-      text-align: center;
-      vertical-align: middle;
-    }
-
-    th.lbl, td.lbl {
-      text-align: left;
-      position: sticky;
-      left: 0;
-      background: #fafafa;
-      font-size: 0.62rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #aaa;
-      white-space: nowrap;
-      width: 52px;
-      min-width: 52px;
-      border-right: 1px solid #ebebeb;
-      z-index: 1;
-      line-height: 1.3;
-    }
-
-    thead tr { border-bottom: 2px solid #e8e8e8; }
-    th.day-h {
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: #555;
-      letter-spacing: 0.04em;
-      min-width: 68px;
-    }
-
-    tbody tr:not(.section-head):not(.model-head) { border-bottom: 1px solid #f0f0f0; }
-    tbody tr:nth-child(even) td:not(.lbl) { background: #fafafa; }
-    tbody tr:nth-child(even) td.lbl      { background: #f4f4f4; }
-
-    tr.section-head td {
-      background: #f0f0f0 !important;
-      font-size: 0.6rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #999;
-      padding: 4px 8px;
-      border-top: 1px solid #e0e0e0;
-      border-bottom: 1px solid #e0e0e0;
-    }
-    tr.section-head td.lbl { background: #e8e8e8 !important; }
-
-    tr.model-sep td {
-      height: 10px;
-      background: #f5f5f5 !important;
-      border-bottom: 1px solid #e0e0e0;
-    }
-
-    tr.model-head td {
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      padding: 5px 8px;
-      border-top: 2px solid #e0e0e0;
-      color: #fff;
-    }
-
-    /* Weather icon row */
-    .wx-icon  { font-size: 1.5rem; line-height: 1; display: block; }
-    .wx-short { font-size: 0.67rem; color: #666; margin-top: 3px; line-height: 1.2; }
-
-    /* Beaufort colored wind cell */
-    .bft-mph { font-family: monospace; font-size: 0.82rem; font-weight: 600; }
-
-    /* Precip */
-    .precip-pct { font-family: monospace; font-size: 0.85rem; font-weight: 600; }
-    .precip-bar { height: 3px; border-radius: 2px; margin-top: 3px; background: #e8e8e8; overflow: hidden; }
-    .precip-fill { height: 100%; border-radius: 2px; }
-
-    /* Snow */
-    .snow-val  { font-family: monospace; font-size: 0.85rem; font-weight: 600; color: #5590cc; }
-    .snow-unit { font-size: 0.68rem; color: #aaa; }
-
-    /* Freeze */
-    .fz-val { font-family: monospace; font-size: 0.85rem; font-weight: 600; }
-
-    /* Altitude wind */
-    .wind-cell { font-family: monospace; font-size: 0.82rem; white-space: nowrap; }
-
-    .nil { color: #ccc; font-size: 0.75rem; }
-
-    .empty {
-      color: #bbb;
-      font-size: 0.85rem;
-      text-align: center;
-      padding: 32px 0;
-      font-family: monospace;
-    }
-
-    /* Instructions */
-    .instructions {
-      margin-top: 28px;
-      border-top: 1px solid #e0e0e0;
-      padding-top: 16px;
-    }
-    .instructions summary {
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #aaa;
-      cursor: pointer;
-      user-select: none;
-      margin-bottom: 12px;
-    }
-    .instructions summary::-webkit-details-marker { color: #ccc; }
-    .instructions p {
-      font-size: 0.82rem;
-      color: #555;
-      margin-bottom: 10px;
-    }
-    .instructions strong { color: #333; }
-    .instructions table {
-      border-collapse: collapse;
-      width: auto;
-      font-size: 0.8rem;
-    }
-    .instructions td {
-      padding: 5px 10px 5px 0;
-      text-align: left;
-      vertical-align: top;
-      color: #555;
-    }
-    .instructions td:first-child {
-      font-family: monospace;
-      font-weight: 700;
-      color: #333;
-      white-space: nowrap;
-      padding-right: 16px;
-    }
-    .instructions .models-note {
-      font-size: 0.72rem;
-      color: #aaa;
-      margin-top: 10px;
-    }
-
-    /* ── Forecast builder ──────────────────────────────────────────────────── */
-    .builder {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-top: 4px;
-    }
-
-    .builder-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .builder-label {
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #aaa;
-      min-width: 72px;
-    }
-
-    .builder-opts {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      align-items: center;
-    }
-
-    .opt-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 9px;
-      border: 1px solid #d0d0d0;
-      border-radius: 4px;
-      font-size: 0.78rem;
-      cursor: pointer;
-      background: #fff;
-      user-select: none;
-      white-space: nowrap;
-    }
-    .opt-btn:has(input:checked) {
-      border-color: #2a6bb5;
-      background: #eaf1fb;
-      color: #1a4a88;
-    }
-    .opt-btn input { display: none; }
-
-    .days-wrap {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    #days-slider {
-      width: 130px;
-      accent-color: #2a6bb5;
-    }
-    #days-display {
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: #333;
-      min-width: 48px;
-    }
-
-    .builder-length {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-top: 4px;
-    }
-    .len-bar-wrap {
-      flex: 1;
-      max-width: 200px;
-      height: 6px;
-      background: #e8e8e8;
-      border-radius: 3px;
-      overflow: hidden;
-    }
-    .len-bar { height: 100%; border-radius: 3px; transition: width 0.15s, background 0.15s; }
-    .len-text {
-      font-size: 0.78rem;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .len-ok   { color: #2a8f5a; }
-    .len-over { color: #cc2222; }
-
-    .builder-output {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #fff;
-      border: 1px solid #d0d0d0;
-      border-radius: 6px;
-      padding: 8px 12px;
-      margin-top: 4px;
-    }
-    .builder-output code {
-      flex: 1;
-      font-family: monospace;
-      font-size: 0.85rem;
-      color: #333;
-      word-break: break-all;
-    }
-    .copy-btn {
-      padding: 4px 10px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      border: 1px solid #d0d0d0;
-      border-radius: 4px;
-      background: #f5f5f5;
-      cursor: pointer;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .copy-btn:active { background: #e0e0e0; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Denali WX</h1>
-    <span class="subtitle">inReach decoder · 63.07°N 151.01°W</span>
-  </header>
-
-  <textarea
-    id="input"
-    placeholder="Paste inReach message containing the encoded forecast…"
-    autocorrect="off"
-    autocapitalize="off"
-    spellcheck="false"
-  ></textarea>
-
-  <div id="output"></div>
-
-  <details class="instructions" open>
-    <summary>How to request a forecast</summary>
-    <p>Send a message to <strong>wx@email.laneaasen.com</strong> from your inReach. Put the keyword in the message body (subject is ignored):</p>
-    <table>
-      <tr><td>10d</td><td>10-day, daily · ECMWF + GFS <em>(default — send blank)</em></td></tr>
-      <tr><td>5d</td><td>5-day, daily · ECMWF + GFS + ICON</td></tr>
-      <tr><td>1d</td><td>Today, hourly · ECMWF <em>(also: now, today)</em></td></tr>
-      <tr><td>6h</td><td>5-day, 6-hourly · ECMWF</td></tr>
-      <tr><td>12h</td><td>5-day, 12-hourly · ECMWF + GFS</td></tr>
-    </table>
-    <p class="models-note">Altitude levels: 500 hPa ≈ 18k ft &nbsp;·&nbsp; 600 hPa ≈ 14k ft &nbsp;·&nbsp; 700 hPa ≈ 10k ft</p>
-  </details>
-
-  <details class="instructions">
-    <summary>Build a forecast request</summary>
-    <div class="builder">
-
-      <div class="builder-row">
-        <span class="builder-label">Location</span>
-        <div class="builder-opts" id="b-location">
-          <label class="opt-btn"><input type="radio" name="location" value="upper" checked> Upper mountain</label>
-          <label class="opt-btn"><input type="radio" name="location" value="airstrip"> Airstrip</label>
-        </div>
-      </div>
-
-      <div class="builder-row">
-        <span class="builder-label">Days</span>
-        <div class="days-wrap">
-          <input type="range" id="days-slider" min="1" max="10" value="5">
-          <span id="days-display">5 days</span>
-        </div>
-      </div>
-
-      <div class="builder-row">
-        <span class="builder-label">Resolution</span>
-        <div class="builder-opts" id="b-resolution">
-          <label class="opt-btn"><input type="radio" name="resolution" value="24"> Daily</label>
-          <label class="opt-btn"><input type="radio" name="resolution" value="12"> 12h</label>
-          <label class="opt-btn"><input type="radio" name="resolution" value="6" checked> 6h</label>
-          <label class="opt-btn"><input type="radio" name="resolution" value="3"> 3h</label>
-          <label class="opt-btn"><input type="radio" name="resolution" value="1"> 1h</label>
-        </div>
-      </div>
-
-      <div class="builder-row">
-        <span class="builder-label">Models</span>
-        <div class="builder-opts" id="b-models">
-          <label class="opt-btn"><input type="checkbox" name="model" value="ecmwf" checked> ECMWF</label>
-          <label class="opt-btn"><input type="checkbox" name="model" value="gfs" checked> GFS</label>
-          <label class="opt-btn"><input type="checkbox" name="model" value="icon"> ICON</label>
-        </div>
-      </div>
-
-      <div class="builder-row">
-        <span class="builder-label">Forecast Length</span>
-        <div class="builder-length">
-          <div class="len-bar-wrap"><div class="len-bar" id="len-bar"></div></div>
-          <span class="len-text" id="len-text"></span>
-        </div>
-      </div>
-
-      <div class="builder-output">
-        <code id="builder-msg"></code>
-        <button class="copy-btn" id="builder-copy">Copy</button>
-      </div>
-
-    </div>
-  </details>
-
-  <script>
-    // ── WMO lookup ────────────────────────────────────────────────────────────
-    const WMO = {
-      0:  ['Clear sky',            'Clear',          '☀️'],
-      1:  ['Mainly clear',         'Mainly clear',   '🌤️'],
-      2:  ['Partly cloudy',        'Partly cloudy',  '⛅'],
-      3:  ['Overcast',             'Overcast',       '☁️'],
-      45: ['Fog',                  'Fog',            '🌫️'],
-      48: ['Rime fog',             'Rime fog',       '🌫️'],
-      51: ['Light drizzle',        'Lt drizzle',     '🌦️'],
-      53: ['Moderate drizzle',     'Drizzle',        '🌦️'],
-      55: ['Dense drizzle',        'Dense drizzle',  '🌦️'],
-      56: ['Lt freezing drizzle',  'Frz drizzle',    '🌨️'],
-      57: ['Hvy freezing drizzle', 'Frz drizzle',    '🌨️'],
-      61: ['Slight rain',          'Light rain',     '🌧️'],
-      63: ['Moderate rain',        'Rain',           '🌧️'],
-      65: ['Heavy rain',           'Heavy rain',     '🌧️'],
-      66: ['Lt freezing rain',     'Frz rain',       '🌨️'],
-      67: ['Hvy freezing rain',    'Frz rain',       '🌨️'],
-      71: ['Slight snow',          'Light snow',     '❄️'],
-      73: ['Moderate snow',        'Snow',           '❄️'],
-      75: ['Heavy snow',           'Heavy snow',     '❄️'],
-      77: ['Snow grains',          'Snow grains',    '🌨️'],
-      80: ['Slight showers',       'Showers',        '🌧️'],
-      81: ['Moderate showers',     'Showers',        '🌧️'],
-      82: ['Violent showers',      'Hvy showers',    '🌧️'],
-      85: ['Slight snow showers',  'Snow showers',   '🌨️'],
-      86: ['Heavy snow showers',   'Snow showers',   '🌨️'],
-      95: ['Thunderstorm',         'Thunder',        '⛈️'],
-      96: ['Thunder + hail',       'Thunder/hail',   '⛈️'],
-      99: ['Thunder + hail',       'Thunder/hail',   '⛈️'],
-    };
-
-    const ARROWS = { N:'↓', NE:'↙', E:'←', SE:'↖', S:'↑', SW:'↗', W:'→', NW:'↘' };
-
-    // Beaufort: [mph upper bound, label, bg, fg]
-    const BEAUFORT = [
-      [1,        'Calm',          '#7e97a0', '#fff'],
-      [4,        'Light air',     '#7e97a0', '#fff'],
-      [8,        'Lt breeze',     '#82c8ec', '#1a1a1a'],
-      [13,       'Gentle',        '#3a9ecc', '#fff'],
-      [19,       'Moderate',      '#3a9e88', '#fff'],
-      [25,       'Fresh',         '#4a9e30', '#fff'],
-      [32,       'Strong',        '#d47810', '#fff'],
-      [39,       'Near gale',     '#9e2818', '#fff'],
-      [47,       'Gale',          '#dd0028', '#fff'],
-      [55,       'Strong gale',   '#8800aa', '#fff'],
-      [64,       'Storm',         '#5030b0', '#fff'],
-      [73,       'Violent storm', '#006888', '#fff'],
-      [Infinity, 'Hurricane',     '#00cc44', '#fff'],
-    ];
-
-    const MODEL_COLORS = {
-      ECMWF: '#2a6bb5',
-      GFS:   '#2a8f5a',
-      ICON:  '#c06010',
-    };
-
-    // ── Type metadata (must match encoding.py) ────────────────────────────────
-    const TYPE_MODELS = [
-      ['ECMWF', 'GFS'],
-      ['ECMWF', 'GFS', 'ICON'],
-      ['ECMWF'],
-      ['ECMWF'],
-      ['ECMWF', 'GFS'],
-    ];
-    const TYPE_LABEL = [
-      '10-day daily · ECMWF + GFS',
-      '5-day daily · ECMWF + GFS + ICON',
-      'Today hourly · ECMWF',
-      '5-day 6-hourly · ECMWF',
-      '5-day 12-hourly · ECMWF + GFS',
-    ];
-    const TYPE_N_PERIODS  = [10, 5, 20, 20, 10];
-    const TYPE_IS_FULL    = [true, true, true, true, true];
-    const TYPE_HAS_SNOW   = [true, true, true, true, true];
-    const TYPE_TIME_STEP  = [24, 24, 1, 6, 12]; // hours between periods
-
-    // ── Printable ASCII base-94 decoder ──────────────────────────────────────
-    const ALPHABET = "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
-
-    const A2I = Object.fromEntries([...ALPHABET].map((c, i) => [c, i]));
-    const WMO_CODES = [0,1,2,3,45,48,51,53,55,56,57,61,63,65,66,67,71,73,75,77,80,81,82,85,86,95,96,99];
-    const CARDINALS = ['N','NE','E','SE','S','SW','W','NW'];
-    // Maps message length in chars → exact bit count.
-    const CHARS_TO_BITS = {94: 612, 124: 812};
-
-    function safeToBits(s) {
-      const nBits = CHARS_TO_BITS[s.length];
-      if (!nBits) return null;
-      let value = 0n;
-      for (const c of s) {
-        const idx = A2I[c];
-        if (idx !== undefined) value = value * 94n + BigInt(idx);
-      }
-      const bits = new Array(nBits).fill(0);
-      for (let i = nBits - 1; i >= 0; i--) {
-        bits[i] = Number(value & 1n);
-        value >>= 1n;
-      }
-      return bits;
-    }
-
-    function readInt(bits, pos, n) {
-      let v = 0;
-      for (let i = 0; i < n; i++) v = (v << 1) | (bits[pos + i] || 0);
-      return [v, pos + n];
-    }
-
-    function readWinds(bits, pos) {
-      const w = [];
-      for (let i = 0; i < 3; i++) {
-        const [spd, p1] = readInt(bits, pos, 4);
-        const [dir, p2] = readInt(bits, p1, 3);
-        w.push({ ws: spd * 5, dir: CARDINALS[dir] });
-        pos = p2;
-      }
-      return [w, pos];
-    }
-
-    function decodeFullPeriod(bits, pos) {
-      let wc, pr, fz, sn, cl, w;
-      [wc, pos] = readInt(bits, pos, 5);
-      [pr, pos] = readInt(bits, pos, 3);
-      [fz, pos] = readInt(bits, pos, 4);
-      [sn, pos] = readInt(bits, pos, 4);
-      [cl, pos] = readInt(bits, pos, 3);
-      [w,  pos] = readWinds(bits, pos);
-      return { pos, wc: WMO_CODES[wc] ?? 0, precip: Math.round(pr * 12.5),
-               fz_ft: fz * 1000, snow: sn, cloud: Math.round(cl * 12.5),
-               p500: w[0], p600: w[1], p700: w[2] };
-    }
-
-    function decodeSubPeriod(bits, pos) {
-      let wc, pr, fz, cl, w;
-      [wc, pos] = readInt(bits, pos, 5);
-      [pr, pos] = readInt(bits, pos, 4);
-      [fz, pos] = readInt(bits, pos, 4);
-      [cl, pos] = readInt(bits, pos, 4);
-      [w,  pos] = readWinds(bits, pos);
-      return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
-               fz_ft: fz * 1000, cloud: cl * 10,
-               p500: w[0], p600: w[1], p700: w[2] };
-    }
-
-    function decodeCompactPeriod(bits, pos) {
-      let wc, pr, w;
-      [wc, pos] = readInt(bits, pos, 5);
-      [pr, pos] = readInt(bits, pos, 4);
-      [w,  pos] = readWinds(bits, pos);
-      return { pos, wc: WMO_CODES[wc] ?? 0, precip: pr * 10,
-               p500: w[0], p600: w[1], p700: w[2] };
-    }
-
-    // ── Parse ─────────────────────────────────────────────────────────────────
-    function parse(text) {
-      const bits = safeToBits(text);
-      if (!bits) return null;
-
-      let [t,     pos] = readInt(bits, 0,   3);
-      let [month, p2]  = readInt(bits, pos, 4); pos = p2;
-      let [day,   p3]  = readInt(bits, pos, 5); pos = p3;
-
-      if (t > 4 || month < 1 || month > 12 || day < 1 || day > 31) return null;
-
-      const models    = TYPE_MODELS[t];
-      const nPeriods  = TYPE_N_PERIODS[t];
-      const isFull    = TYPE_IS_FULL[t];
-      const hasSnow   = TYPE_HAS_SNOW[t];
-      const timeStep  = TYPE_TIME_STEP[t];
-      const decodePrimary = isFull ? decodeFullPeriod : decodeSubPeriod;
-
-      const today = new Date();
-      const start = new Date(today.getFullYear(), month - 1, day);
-      if ((today - start) / 86400000 > 180) start.setFullYear(start.getFullYear() + 1);
-
-      // Base time: noon for daily, midnight for sub-daily
-      const baseMs = timeStep >= 24
-        ? new Date(start.getFullYear(), start.getMonth(), start.getDate(), 12).getTime()
-        : new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0).getTime();
-      const stepMs = timeStep * 3600000;
-
-      const allPeriods = Array.from({ length: models.length }, () => []);
-
-      for (let i = 0; i < nPeriods; i++) {
-        const date = new Date(baseMs + i * stepMs);
-        for (let m = 0; m < models.length; m++) {
-          const p = decodePrimary(bits, pos);
-          pos = p.pos;
-          allPeriods[m].push({ ...p, date });
-        }
-      }
-
-      const snowUnit = timeStep >= 24 ? 1 : 0.1;
-      return { type: t, label: TYPE_LABEL[t], models, hasSnow, timeStep, snowUnit,
-               periods: allPeriods };
-    }
-
-    // ── Render helpers ────────────────────────────────────────────────────────
-    function beaufort(mph) {
-      const i = BEAUFORT.findIndex(([t]) => mph < t);
-      return { bg: BEAUFORT[i][2], fg: BEAUFORT[i][3] };
-    }
-
-    function wmoIcon(c)  { return (WMO[c] || ['','','❓'])[2]; }
-    function wmoShort(c) { return (WMO[c] || ['',`wc${c}`,''])[1]; }
-
-    function precipColor(pct) {
-      if (pct >= 60) return '#c04040';
-      if (pct >= 30) return '#c08020';
-      return '#4080c8';
-    }
-
-    function windCell(ws, dir, colored) {
-      if (ws == null) return '<span class="nil">—</span>';
-      const arrow = dir ? (ARROWS[dir] || '') : '';
-      const inner = `<div class="wind-cell"><span class="bft-mph">${ws} mph</span>${dir ? ` <span style="font-size:.75rem"> ${dir} ${arrow}</span>` : ''}</div>`;
-      if (!colored || !ws) return inner;
-      const b = beaufort(ws);
-      return { style: `background:${b.bg};color:${b.fg}`, html: inner };
-    }
-
-    function periodLabel(date, timeStep) {
-      const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      if (timeStep >= 24) {
-        return `${days[date.getDay()]}<br><span style="font-weight:400;opacity:.7">${date.getMonth()+1}/${date.getDate()}</span>`;
-      } else if (timeStep === 1) {
-        return `${String(date.getHours()).padStart(2,'0')}:00`;
-      } else {
-        return `${days[date.getDay()]}<br><span style="font-weight:400;opacity:.7">${date.getHours()}h</span>`;
-      }
-    }
-
-    // ── Render ────────────────────────────────────────────────────────────────
-    function render(fc) {
-      const { type, label, models, hasSnow, timeStep, snowUnit, periods } = fc;
-      const primary = periods[0];
-      const extras  = periods.slice(1);
-      const n = primary.length;
-
-      function row(lbl, cells, cls = '') {
-        const tds = cells.map(c => {
-          if (c && typeof c === 'object' && 'html' in c)
-            return `<td style="${c.style || ''}">${c.html}</td>`;
-          return `<td>${c}</td>`;
-        }).join('');
-        return `<tr class="${cls}"><td class="lbl">${lbl}</td>${tds}</tr>`;
-      }
-
-      function sectionRow(lbl) {
-        return `<tr class="section-head"><td class="lbl">${lbl}</td>${primary.map(() => '<td></td>').join('')}</tr>`;
-      }
-
-      function sepRow() {
-        return `<tr class="model-sep">${Array(n + 1).fill('<td></td>').join('')}</tr>`;
-      }
-
-      function modelRow(name) {
-        const color = MODEL_COLORS[name] || '#666';
-        return `<tr class="model-head"><td colspan="${n + 1}" style="background:${color}">${name}</td></tr>`;
-      }
-
-      function iconCells(ps) {
-        return ps.map(p =>
-          `<span class="wx-icon">${wmoIcon(p.wc)}</span><div class="wx-short">${wmoShort(p.wc)}</div>`
-        );
-      }
-
-      function precipCells(ps) {
-        return ps.map(p => {
-          const c = precipColor(p.precip);
-          return `<div class="precip-pct" style="color:${c}">${p.precip}%</div>`+
-                 `<div class="precip-bar"><div class="precip-fill" style="width:${p.precip}%;background:${c}"></div></div>`;
-        });
-      }
-
-      function cloudCells(ps) {
-        return ps.map(p =>
-          p.cloud != null
-            ? `<div class="precip-pct" style="color:#777">${p.cloud}%</div>`+
-              `<div class="precip-bar"><div class="precip-fill" style="width:${p.cloud}%;background:#aaa"></div></div>`
-            : '<span class="nil">—</span>'
-        );
-      }
-
-      function snowCells(ps) {
-        return ps.map(p => {
-          const val = p.snow * snowUnit;
-          return val
-            ? `<span class="snow-val">${val.toFixed(snowUnit < 1 ? 1 : 0)}</span> <span class="snow-unit">in</span>`
-            : '<span class="nil">—</span>';
-        });
-      }
-
-      function freezeCells(ps) {
-        return ps.map(p =>
-          p.fz_ft != null
-            ? `<span class="fz-val">${p.fz_ft.toLocaleString()}</span> <span class="snow-unit">ft</span>`
-            : '<span class="nil">—</span>'
-        );
-      }
-
-      function altRows(ps) {
-        const w700 = ps.map(p => p.p700 ? windCell(p.p700.ws, p.p700.dir, true) : '<span class="nil">—</span>');
-        const w500 = ps.map(p => p.p500 ? windCell(p.p500.ws, p.p500.dir, true) : '<span class="nil">—</span>');
-        const w600 = ps.map(p => p.p600 ? windCell(p.p600.ws, p.p600.dir, true) : '<span class="nil">—</span>');
-        return `
-          ${sectionRow('Alt')}
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, maximum-scale=1"
+        />
+        <title>Denali WX</title>
+        <link rel="manifest" href="manifest.json" />
+        <meta name="theme-color" content="#f5f5f5" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <style>
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                background: #f5f5f5;
+                color: #1a1a1a;
+                font-family:
+                    system-ui,
+                    -apple-system,
+                    sans-serif;
+                font-size: 15px;
+                line-height: 1.4;
+                padding: 14px;
+                min-height: 100dvh;
+            }
+
+            header {
+                display: flex;
+                align-items: baseline;
+                gap: 10px;
+                margin-bottom: 12px;
+            }
+            h1 {
+                font-size: 0.72rem;
+                font-weight: 600;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: #999;
+            }
+            .subtitle {
+                font-size: 0.68rem;
+                color: #bbb;
+                letter-spacing: 0.03em;
+            }
+
+            textarea {
+                width: 100%;
+                background: #fff;
+                color: #1a1a1a;
+                border: 1px solid #d0d0d0;
+                border-radius: 6px;
+                padding: 10px 12px;
+                font-family: monospace;
+                font-size: 12px;
+                line-height: 1.5;
+                resize: vertical;
+                min-height: 60px;
+                outline: none;
+                margin-bottom: 12px;
+                -webkit-appearance: none;
+            }
+            textarea::placeholder {
+                color: #bbb;
+            }
+            textarea:focus {
+                border-color: #999;
+            }
+
+            .type-badge {
+                font-size: 0.68rem;
+                font-weight: 600;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                color: #888;
+                margin-bottom: 8px;
+            }
+
+            .table-wrap {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                border-radius: 8px;
+                border: 1px solid #e0e0e0;
+                background: #fff;
+                margin-bottom: 20px;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            th,
+            td {
+                padding: 7px 8px;
+                text-align: center;
+                vertical-align: middle;
+            }
+
+            th.lbl,
+            td.lbl {
+                text-align: left;
+                position: sticky;
+                left: 0;
+                background: #fafafa;
+                font-size: 0.62rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: #aaa;
+                white-space: nowrap;
+                width: 52px;
+                min-width: 52px;
+                border-right: 1px solid #ebebeb;
+                z-index: 1;
+                line-height: 1.3;
+            }
+
+            thead tr {
+                border-bottom: 2px solid #e8e8e8;
+            }
+            th.day-h {
+                font-size: 0.78rem;
+                font-weight: 700;
+                color: #555;
+                letter-spacing: 0.04em;
+                min-width: 68px;
+            }
+
+            tbody tr:not(.section-head):not(.model-head) {
+                border-bottom: 1px solid #f0f0f0;
+            }
+            tbody tr:nth-child(even) td:not(.lbl) {
+                background: #fafafa;
+            }
+            tbody tr:nth-child(even) td.lbl {
+                background: #f4f4f4;
+            }
+
+            tr.section-head td {
+                background: #f0f0f0 !important;
+                font-size: 0.6rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: #999;
+                padding: 4px 8px;
+                border-top: 1px solid #e0e0e0;
+                border-bottom: 1px solid #e0e0e0;
+            }
+            tr.section-head td.lbl {
+                background: #e8e8e8 !important;
+            }
+
+            tr.model-sep td {
+                height: 10px;
+                background: #f5f5f5 !important;
+                border-bottom: 1px solid #e0e0e0;
+            }
+
+            tr.model-head td {
+                font-size: 0.65rem;
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                padding: 5px 8px;
+                border-top: 2px solid #e0e0e0;
+                color: #fff;
+            }
+
+            /* Weather icon row */
+            .wx-icon {
+                font-size: 1.5rem;
+                line-height: 1;
+                display: block;
+            }
+            .wx-short {
+                font-size: 0.67rem;
+                color: #666;
+                margin-top: 3px;
+                line-height: 1.2;
+            }
+
+            /* Beaufort colored wind cell */
+            .bft-mph {
+                font-family: monospace;
+                font-size: 0.82rem;
+                font-weight: 600;
+            }
+
+            /* Precip */
+            .precip-pct {
+                font-family: monospace;
+                font-size: 0.85rem;
+                font-weight: 600;
+            }
+            .precip-bar {
+                height: 3px;
+                border-radius: 2px;
+                margin-top: 3px;
+                background: #e8e8e8;
+                overflow: hidden;
+            }
+            .precip-fill {
+                height: 100%;
+                border-radius: 2px;
+            }
+
+            /* Snow */
+            .snow-val {
+                font-family: monospace;
+                font-size: 0.85rem;
+                font-weight: 600;
+                color: #5590cc;
+            }
+            .snow-unit {
+                font-size: 0.68rem;
+                color: #aaa;
+            }
+
+            /* Freeze */
+            .fz-val {
+                font-family: monospace;
+                font-size: 0.85rem;
+                font-weight: 600;
+            }
+
+            /* Altitude wind */
+            .wind-cell {
+                font-family: monospace;
+                font-size: 0.82rem;
+                white-space: nowrap;
+            }
+
+            .nil {
+                color: #ccc;
+                font-size: 0.75rem;
+            }
+
+            .empty {
+                color: #bbb;
+                font-size: 0.85rem;
+                text-align: center;
+                padding: 32px 0;
+                font-family: monospace;
+            }
+
+            /* ── Steps ─────────────────────────────────────────────────────────────── */
+            .step {
+                border-top: 1px solid #e0e0e0;
+                padding-top: 16px;
+                margin-bottom: 20px;
+            }
+            .step-head {
+                font-size: 0.72rem;
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #aaa;
+                margin-bottom: 12px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .step-num {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                background: #ddd;
+                color: #888;
+                font-size: 0.68rem;
+                font-weight: 700;
+                flex-shrink: 0;
+            }
+            .step p {
+                font-size: 0.82rem;
+                color: #555;
+            }
+            .step strong {
+                color: #333;
+            }
+            .step .note {
+                font-size: 0.72rem;
+                color: #aaa;
+                margin-top: 8px;
+            }
+
+            /* ── Forecast builder ──────────────────────────────────────────────────── */
+            .builder {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                margin-top: 4px;
+            }
+
+            .builder-row {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .builder-label {
+                font-size: 0.72rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: #aaa;
+                min-width: 72px;
+            }
+
+            .builder-opts {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                align-items: center;
+            }
+
+            .opt-btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 3px 9px;
+                border: 1px solid #d0d0d0;
+                border-radius: 4px;
+                font-size: 0.78rem;
+                cursor: pointer;
+                background: #fff;
+                user-select: none;
+                white-space: nowrap;
+            }
+            .opt-btn:has(input:checked) {
+                border-color: #2a6bb5;
+                background: #eaf1fb;
+                color: #1a4a88;
+            }
+            .opt-btn input {
+                display: none;
+            }
+
+            .days-wrap {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            #days-slider {
+                width: 130px;
+                accent-color: #2a6bb5;
+            }
+            #days-display {
+                font-size: 0.82rem;
+                font-weight: 600;
+                color: #333;
+                min-width: 48px;
+            }
+
+            .builder-length {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-top: 4px;
+            }
+            .len-bar-wrap {
+                flex: 1;
+                max-width: 200px;
+                height: 6px;
+                background: #e8e8e8;
+                border-radius: 3px;
+                overflow: hidden;
+            }
+            .len-bar {
+                height: 100%;
+                border-radius: 3px;
+                transition:
+                    width 0.15s,
+                    background 0.15s;
+            }
+            .len-text {
+                font-size: 0.78rem;
+                font-weight: 600;
+                white-space: nowrap;
+            }
+            .len-ok {
+                color: #2a8f5a;
+            }
+            .len-over {
+                color: #cc2222;
+            }
+
+            .builder-output {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                background: #fff;
+                border: 1px solid #d0d0d0;
+                border-radius: 6px;
+                padding: 8px 12px;
+                margin-top: 4px;
+            }
+            .builder-output code {
+                flex: 1;
+                font-family: monospace;
+                font-size: 0.85rem;
+                color: #333;
+                word-break: break-all;
+            }
+            .copy-btn {
+                padding: 4px 10px;
+                font-size: 0.75rem;
+                font-weight: 600;
+                border: 1px solid #d0d0d0;
+                border-radius: 4px;
+                background: #f5f5f5;
+                cursor: pointer;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+            .copy-btn:active {
+                background: #e0e0e0;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>Denali WX</h1>
+            <span class="subtitle">inReach decoder · 63.07°N 151.01°W</span>
+        </header>
+
+        <section class="step">
+            <div class="step-head">
+                <span class="step-num">1</span> Build your forecast request
+            </div>
+            <div class="builder">
+                <div class="builder-row">
+                    <span class="builder-label">Location</span>
+                    <div class="builder-opts">
+                        <label class="opt-btn"
+                            ><input
+                                type="radio"
+                                name="location"
+                                value="upper"
+                                checked
+                            />
+                            Upper mountain</label
+                        >
+                        <label class="opt-btn"
+                            ><input
+                                type="radio"
+                                name="location"
+                                value="airstrip"
+                            />
+                            Airstrip</label
+                        >
+                    </div>
+                </div>
+
+                <div class="builder-row">
+                    <span class="builder-label">Days</span>
+                    <div class="days-wrap">
+                        <input
+                            type="range"
+                            id="days-slider"
+                            min="1"
+                            max="10"
+                            value="10"
+                        />
+                        <span id="days-display">10 days</span>
+                    </div>
+                </div>
+
+                <div class="builder-row">
+                    <span class="builder-label">Resolution</span>
+                    <div class="builder-opts">
+                        <label class="opt-btn"
+                            ><input
+                                type="radio"
+                                name="resolution"
+                                value="24"
+                                checked
+                            />
+                            Daily</label
+                        >
+                        <label class="opt-btn"
+                            ><input type="radio" name="resolution" value="12" />
+                            12h</label
+                        >
+                        <label class="opt-btn"
+                            ><input type="radio" name="resolution" value="6" />
+                            6h</label
+                        >
+                        <label class="opt-btn"
+                            ><input type="radio" name="resolution" value="3" />
+                            3h</label
+                        >
+                        <label class="opt-btn"
+                            ><input type="radio" name="resolution" value="1" />
+                            1h</label
+                        >
+                    </div>
+                </div>
+
+                <div class="builder-row">
+                    <span class="builder-label">Models</span>
+                    <div class="builder-opts">
+                        <label class="opt-btn"
+                            ><input
+                                type="checkbox"
+                                name="model"
+                                value="ecmwf"
+                                checked
+                            />
+                            ECMWF</label
+                        >
+                        <label class="opt-btn"
+                            ><input type="checkbox" name="model" value="gfs" />
+                            GFS</label
+                        >
+                        <label class="opt-btn"
+                            ><input type="checkbox" name="model" value="icon" />
+                            ICON</label
+                        >
+                    </div>
+                </div>
+
+                <div class="builder-row">
+                    <span class="builder-label">Forecast Length</span>
+                    <div class="builder-length">
+                        <div class="len-bar-wrap">
+                            <div class="len-bar" id="len-bar"></div>
+                        </div>
+                        <span class="len-text" id="len-text"></span>
+                    </div>
+                </div>
+
+                <div class="builder-output">
+                    <code id="builder-msg"></code>
+                    <button class="copy-btn" id="builder-copy">Copy</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="step">
+            <div class="step-head">
+                <span class="step-num">2</span> Send the message
+            </div>
+            <p>
+                Send the message above to
+                <strong>wx@email.laneaasen.com</strong> from your inReach
+                device. The encoded forecast will be sent back automatically.
+            </p>
+        </section>
+
+        <section class="step">
+            <div class="step-head">
+                <span class="step-num">3</span> Decode the forecast response
+            </div>
+            <textarea
+                id="input"
+                placeholder="Paste the encoded forecast from your inReach…"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+            ></textarea>
+            <div id="output"></div>
+        </section>
+
+        <script>
+            // ── WMO lookup ────────────────────────────────────────────────────────────
+            const WMO = {
+                0: ["Clear sky", "Clear", "☀️"],
+                1: ["Mainly clear", "Mainly clear", "🌤️"],
+                2: ["Partly cloudy", "Partly cloudy", "⛅"],
+                3: ["Overcast", "Overcast", "☁️"],
+                45: ["Fog", "Fog", "🌫️"],
+                48: ["Rime fog", "Rime fog", "🌫️"],
+                51: ["Light drizzle", "Lt drizzle", "🌦️"],
+                53: ["Moderate drizzle", "Drizzle", "🌦️"],
+                55: ["Dense drizzle", "Dense drizzle", "🌦️"],
+                56: ["Lt freezing drizzle", "Frz drizzle", "🌨️"],
+                57: ["Hvy freezing drizzle", "Frz drizzle", "🌨️"],
+                61: ["Slight rain", "Light rain", "🌧️"],
+                63: ["Moderate rain", "Rain", "🌧️"],
+                65: ["Heavy rain", "Heavy rain", "🌧️"],
+                66: ["Lt freezing rain", "Frz rain", "🌨️"],
+                67: ["Hvy freezing rain", "Frz rain", "🌨️"],
+                71: ["Slight snow", "Light snow", "❄️"],
+                73: ["Moderate snow", "Snow", "❄️"],
+                75: ["Heavy snow", "Heavy snow", "❄️"],
+                77: ["Snow grains", "Snow grains", "🌨️"],
+                80: ["Slight showers", "Showers", "🌧️"],
+                81: ["Moderate showers", "Showers", "🌧️"],
+                82: ["Violent showers", "Hvy showers", "🌧️"],
+                85: ["Slight snow showers", "Snow showers", "🌨️"],
+                86: ["Heavy snow showers", "Snow showers", "🌨️"],
+                95: ["Thunderstorm", "Thunder", "⛈️"],
+                96: ["Thunder + hail", "Thunder/hail", "⛈️"],
+                99: ["Thunder + hail", "Thunder/hail", "⛈️"],
+            };
+
+            const ARROWS = {
+                N: "↓",
+                NE: "↙",
+                E: "←",
+                SE: "↖",
+                S: "↑",
+                SW: "↗",
+                W: "→",
+                NW: "↘",
+            };
+
+            // Beaufort: [mph upper bound, label, bg, fg]
+            const BEAUFORT = [
+                [1, "Calm", "#7e97a0", "#fff"],
+                [4, "Light air", "#7e97a0", "#fff"],
+                [8, "Lt breeze", "#82c8ec", "#1a1a1a"],
+                [13, "Gentle", "#3a9ecc", "#fff"],
+                [19, "Moderate", "#3a9e88", "#fff"],
+                [25, "Fresh", "#4a9e30", "#fff"],
+                [32, "Strong", "#d47810", "#fff"],
+                [39, "Near gale", "#9e2818", "#fff"],
+                [47, "Gale", "#dd0028", "#fff"],
+                [55, "Strong gale", "#8800aa", "#fff"],
+                [64, "Storm", "#5030b0", "#fff"],
+                [73, "Violent storm", "#006888", "#fff"],
+                [Infinity, "Hurricane", "#00cc44", "#fff"],
+            ];
+
+            const MODEL_COLORS = {
+                ECMWF: "#2a6bb5",
+                GFS: "#2a8f5a",
+                ICON: "#c06010",
+            };
+
+            // ── Type metadata (must match encoding.py) ────────────────────────────────
+            const TYPE_MODELS = [
+                ["ECMWF", "GFS"],
+                ["ECMWF", "GFS", "ICON"],
+                ["ECMWF"],
+                ["ECMWF"],
+                ["ECMWF", "GFS"],
+            ];
+            const TYPE_LABEL = [
+                "10-day daily · ECMWF + GFS",
+                "5-day daily · ECMWF + GFS + ICON",
+                "Today hourly · ECMWF",
+                "5-day 6-hourly · ECMWF",
+                "5-day 12-hourly · ECMWF + GFS",
+            ];
+            const TYPE_N_PERIODS = [10, 5, 20, 20, 10];
+            const TYPE_IS_FULL = [true, true, true, true, true];
+            const TYPE_HAS_SNOW = [true, true, true, true, true];
+            const TYPE_TIME_STEP = [24, 24, 1, 6, 12]; // hours between periods
+
+            // ── Printable ASCII base-94 decoder ──────────────────────────────────────
+            const ALPHABET =
+                "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+
+            const A2I = Object.fromEntries([...ALPHABET].map((c, i) => [c, i]));
+            const WMO_CODES = [
+                0, 1, 2, 3, 45, 48, 51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 71,
+                73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99,
+            ];
+            const CARDINALS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+            // Maps message length in chars → exact bit count.
+            const CHARS_TO_BITS = { 94: 612, 124: 812 };
+
+            function safeToBits(s) {
+                const nBits = CHARS_TO_BITS[s.length];
+                if (!nBits) return null;
+                let value = 0n;
+                for (const c of s) {
+                    const idx = A2I[c];
+                    if (idx !== undefined) value = value * 94n + BigInt(idx);
+                }
+                const bits = new Array(nBits).fill(0);
+                for (let i = nBits - 1; i >= 0; i--) {
+                    bits[i] = Number(value & 1n);
+                    value >>= 1n;
+                }
+                return bits;
+            }
+
+            function readInt(bits, pos, n) {
+                let v = 0;
+                for (let i = 0; i < n; i++) v = (v << 1) | (bits[pos + i] || 0);
+                return [v, pos + n];
+            }
+
+            function readWinds(bits, pos) {
+                const w = [];
+                for (let i = 0; i < 3; i++) {
+                    const [spd, p1] = readInt(bits, pos, 4);
+                    const [dir, p2] = readInt(bits, p1, 3);
+                    w.push({ ws: spd * 5, dir: CARDINALS[dir] });
+                    pos = p2;
+                }
+                return [w, pos];
+            }
+
+            function decodeFullPeriod(bits, pos) {
+                let wc, pr, fz, sn, cl, w;
+                [wc, pos] = readInt(bits, pos, 5);
+                [pr, pos] = readInt(bits, pos, 3);
+                [fz, pos] = readInt(bits, pos, 4);
+                [sn, pos] = readInt(bits, pos, 4);
+                [cl, pos] = readInt(bits, pos, 3);
+                [w, pos] = readWinds(bits, pos);
+                return {
+                    pos,
+                    wc: WMO_CODES[wc] ?? 0,
+                    precip: Math.round(pr * 12.5),
+                    fz_ft: fz * 1000,
+                    snow: sn,
+                    cloud: Math.round(cl * 12.5),
+                    p500: w[0],
+                    p600: w[1],
+                    p700: w[2],
+                };
+            }
+
+            function decodeSubPeriod(bits, pos) {
+                let wc, pr, fz, cl, w;
+                [wc, pos] = readInt(bits, pos, 5);
+                [pr, pos] = readInt(bits, pos, 4);
+                [fz, pos] = readInt(bits, pos, 4);
+                [cl, pos] = readInt(bits, pos, 4);
+                [w, pos] = readWinds(bits, pos);
+                return {
+                    pos,
+                    wc: WMO_CODES[wc] ?? 0,
+                    precip: pr * 10,
+                    fz_ft: fz * 1000,
+                    cloud: cl * 10,
+                    p500: w[0],
+                    p600: w[1],
+                    p700: w[2],
+                };
+            }
+
+            function decodeCompactPeriod(bits, pos) {
+                let wc, pr, w;
+                [wc, pos] = readInt(bits, pos, 5);
+                [pr, pos] = readInt(bits, pos, 4);
+                [w, pos] = readWinds(bits, pos);
+                return {
+                    pos,
+                    wc: WMO_CODES[wc] ?? 0,
+                    precip: pr * 10,
+                    p500: w[0],
+                    p600: w[1],
+                    p700: w[2],
+                };
+            }
+
+            // ── Parse ─────────────────────────────────────────────────────────────────
+            function parse(text) {
+                const bits = safeToBits(text);
+                if (!bits) return null;
+
+                let [t, pos] = readInt(bits, 0, 3);
+                let [month, p2] = readInt(bits, pos, 4);
+                pos = p2;
+                let [day, p3] = readInt(bits, pos, 5);
+                pos = p3;
+
+                if (t > 4 || month < 1 || month > 12 || day < 1 || day > 31)
+                    return null;
+
+                const models = TYPE_MODELS[t];
+                const nPeriods = TYPE_N_PERIODS[t];
+                const isFull = TYPE_IS_FULL[t];
+                const hasSnow = TYPE_HAS_SNOW[t];
+                const timeStep = TYPE_TIME_STEP[t];
+                const decodePrimary = isFull
+                    ? decodeFullPeriod
+                    : decodeSubPeriod;
+
+                const today = new Date();
+                const start = new Date(today.getFullYear(), month - 1, day);
+                if ((today - start) / 86400000 > 180)
+                    start.setFullYear(start.getFullYear() + 1);
+
+                // Base time: noon for daily, midnight for sub-daily
+                const baseMs =
+                    timeStep >= 24
+                        ? new Date(
+                              start.getFullYear(),
+                              start.getMonth(),
+                              start.getDate(),
+                              12,
+                          ).getTime()
+                        : new Date(
+                              start.getFullYear(),
+                              start.getMonth(),
+                              start.getDate(),
+                              0,
+                          ).getTime();
+                const stepMs = timeStep * 3600000;
+
+                const allPeriods = Array.from(
+                    { length: models.length },
+                    () => [],
+                );
+
+                for (let i = 0; i < nPeriods; i++) {
+                    const date = new Date(baseMs + i * stepMs);
+                    for (let m = 0; m < models.length; m++) {
+                        const p = decodePrimary(bits, pos);
+                        pos = p.pos;
+                        allPeriods[m].push({ ...p, date });
+                    }
+                }
+
+                const snowUnit = timeStep >= 24 ? 1 : 0.1;
+                return {
+                    type: t,
+                    label: TYPE_LABEL[t],
+                    models,
+                    hasSnow,
+                    timeStep,
+                    snowUnit,
+                    periods: allPeriods,
+                };
+            }
+
+            // ── Render helpers ────────────────────────────────────────────────────────
+            function beaufort(mph) {
+                const i = BEAUFORT.findIndex(([t]) => mph < t);
+                return { bg: BEAUFORT[i][2], fg: BEAUFORT[i][3] };
+            }
+
+            function wmoIcon(c) {
+                return (WMO[c] || ["", "", "❓"])[2];
+            }
+            function wmoShort(c) {
+                return (WMO[c] || ["", `wc${c}`, ""])[1];
+            }
+
+            function precipColor(pct) {
+                if (pct >= 60) return "#c04040";
+                if (pct >= 30) return "#c08020";
+                return "#4080c8";
+            }
+
+            function windCell(ws, dir, colored) {
+                if (ws == null) return '<span class="nil">—</span>';
+                const arrow = dir ? ARROWS[dir] || "" : "";
+                const inner = `<div class="wind-cell"><span class="bft-mph">${ws} mph</span>${dir ? ` <span style="font-size:.75rem"> ${dir} ${arrow}</span>` : ""}</div>`;
+                if (!colored || !ws) return inner;
+                const b = beaufort(ws);
+                return {
+                    style: `background:${b.bg};color:${b.fg}`,
+                    html: inner,
+                };
+            }
+
+            function periodLabel(date, timeStep) {
+                const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                if (timeStep >= 24) {
+                    return `${days[date.getDay()]}<br><span style="font-weight:400;opacity:.7">${date.getMonth() + 1}/${date.getDate()}</span>`;
+                } else if (timeStep === 1) {
+                    return `${String(date.getHours()).padStart(2, "0")}:00`;
+                } else {
+                    return `${days[date.getDay()]}<br><span style="font-weight:400;opacity:.7">${date.getHours()}h</span>`;
+                }
+            }
+
+            // ── Render ────────────────────────────────────────────────────────────────
+            function render(fc) {
+                const {
+                    type,
+                    label,
+                    models,
+                    hasSnow,
+                    timeStep,
+                    snowUnit,
+                    periods,
+                } = fc;
+                const primary = periods[0];
+                const extras = periods.slice(1);
+                const n = primary.length;
+
+                function row(lbl, cells, cls = "") {
+                    const tds = cells
+                        .map((c) => {
+                            if (c && typeof c === "object" && "html" in c)
+                                return `<td style="${c.style || ""}">${c.html}</td>`;
+                            return `<td>${c}</td>`;
+                        })
+                        .join("");
+                    return `<tr class="${cls}"><td class="lbl">${lbl}</td>${tds}</tr>`;
+                }
+
+                function sectionRow(lbl) {
+                    return `<tr class="section-head"><td class="lbl">${lbl}</td>${primary.map(() => "<td></td>").join("")}</tr>`;
+                }
+
+                function sepRow() {
+                    return `<tr class="model-sep">${Array(n + 1)
+                        .fill("<td></td>")
+                        .join("")}</tr>`;
+                }
+
+                function modelRow(name) {
+                    const color = MODEL_COLORS[name] || "#666";
+                    return `<tr class="model-head"><td colspan="${n + 1}" style="background:${color}">${name}</td></tr>`;
+                }
+
+                function iconCells(ps) {
+                    return ps.map(
+                        (p) =>
+                            `<span class="wx-icon">${wmoIcon(p.wc)}</span><div class="wx-short">${wmoShort(p.wc)}</div>`,
+                    );
+                }
+
+                function precipCells(ps) {
+                    return ps.map((p) => {
+                        const c = precipColor(p.precip);
+                        return (
+                            `<div class="precip-pct" style="color:${c}">${p.precip}%</div>` +
+                            `<div class="precip-bar"><div class="precip-fill" style="width:${p.precip}%;background:${c}"></div></div>`
+                        );
+                    });
+                }
+
+                function cloudCells(ps) {
+                    return ps.map((p) =>
+                        p.cloud != null
+                            ? `<div class="precip-pct" style="color:#777">${p.cloud}%</div>` +
+                              `<div class="precip-bar"><div class="precip-fill" style="width:${p.cloud}%;background:#aaa"></div></div>`
+                            : '<span class="nil">—</span>',
+                    );
+                }
+
+                function snowCells(ps) {
+                    return ps.map((p) => {
+                        const val = p.snow * snowUnit;
+                        return val
+                            ? `<span class="snow-val">${val.toFixed(snowUnit < 1 ? 1 : 0)}</span> <span class="snow-unit">in</span>`
+                            : '<span class="nil">—</span>';
+                    });
+                }
+
+                function freezeCells(ps) {
+                    return ps.map((p) =>
+                        p.fz_ft != null
+                            ? `<span class="fz-val">${p.fz_ft.toLocaleString()}</span> <span class="snow-unit">ft</span>`
+                            : '<span class="nil">—</span>',
+                    );
+                }
+
+                function altRows(ps) {
+                    const w700 = ps.map((p) =>
+                        p.p700
+                            ? windCell(p.p700.ws, p.p700.dir, true)
+                            : '<span class="nil">—</span>',
+                    );
+                    const w500 = ps.map((p) =>
+                        p.p500
+                            ? windCell(p.p500.ws, p.p500.dir, true)
+                            : '<span class="nil">—</span>',
+                    );
+                    const w600 = ps.map((p) =>
+                        p.p600
+                            ? windCell(p.p600.ws, p.p600.dir, true)
+                            : '<span class="nil">—</span>',
+                    );
+                    return `
+          ${sectionRow("Alt")}
           ${row('500<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~18k ft</span>', w500)}
           ${row('600<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~14k ft</span>', w600)}
           ${row('700<br><span style="font-weight:400;letter-spacing:0;opacity:.65">~10k ft</span>', w700)}`;
-      }
+                }
 
-      const th = `<th class="lbl"></th>${primary.map(p => `<th class="day-h">${periodLabel(p.date, timeStep)}</th>`).join('')}`;
+                const th = `<th class="lbl"></th>${primary.map((p) => `<th class="day-h">${periodLabel(p.date, timeStep)}</th>`).join("")}`;
 
-      let body = '';
+                let body = "";
 
-      // Primary model section
-      if (models.length > 1) body += modelRow(models[0]);
-      body += row('', iconCells(primary));
-      body += sectionRow('Surface');
-      body += row('Cloud mid', cloudCells(primary));
-      body += row('Precip', precipCells(primary));
-      if (hasSnow) body += row('Snow', snowCells(primary));
-      body += row('Freeze', freezeCells(primary));
-      body += altRows(primary);
-      if (models.length > 1) body += sepRow();
+                // Primary model section
+                if (models.length > 1) body += modelRow(models[0]);
+                body += row("", iconCells(primary));
+                body += sectionRow("Surface");
+                body += row("Cloud mid", cloudCells(primary));
+                body += row("Precip", precipCells(primary));
+                if (hasSnow) body += row("Snow", snowCells(primary));
+                body += row("Freeze", freezeCells(primary));
+                body += altRows(primary);
+                if (models.length > 1) body += sepRow();
 
-      // Additional model sections
-      extras.forEach((ps, mi) => {
-        body += modelRow(models[mi + 1]);
-        body += row('', iconCells(ps));
-        body += sectionRow('Surface');
-        body += row('Cloud mid', cloudCells(ps));
-        body += row('Precip', precipCells(ps));
-        if (hasSnow) body += row('Snow', snowCells(ps));
-        body += row('Freeze', freezeCells(ps));
-        body += altRows(ps);
-        body += sepRow();
-      });
+                // Additional model sections
+                extras.forEach((ps, mi) => {
+                    body += modelRow(models[mi + 1]);
+                    body += row("", iconCells(ps));
+                    body += sectionRow("Surface");
+                    body += row("Cloud mid", cloudCells(ps));
+                    body += row("Precip", precipCells(ps));
+                    if (hasSnow) body += row("Snow", snowCells(ps));
+                    body += row("Freeze", freezeCells(ps));
+                    body += altRows(ps);
+                    body += sepRow();
+                });
 
-      return `<div class="type-badge">${label}</div>
+                return `<div class="type-badge">${label}</div>
               <div class="table-wrap"><table>
                 <thead><tr>${th}</tr></thead>
                 <tbody>${body}</tbody>
               </table></div>`;
-    }
+            }
 
-    // ── Wire up ───────────────────────────────────────────────────────────────
-    const input  = document.getElementById('input');
-    const output = document.getElementById('output');
+            // ── Wire up ───────────────────────────────────────────────────────────────
+            const input = document.getElementById("input");
+            const output = document.getElementById("output");
 
-    input.addEventListener('input', () => {
-      const result = parse(input.value.replace(/\s/g, ''));
-      output.innerHTML = result
-        ? render(result)
-        : (input.value.trim() ? '<p class="empty">Could not decode forecast.</p>' : '');
-    });
+            input.addEventListener("input", () => {
+                const result = parse(input.value.replace(/\s/g, ""));
+                output.innerHTML = result
+                    ? render(result)
+                    : input.value.trim()
+                      ? '<p class="empty">Could not decode forecast.</p>'
+                      : "";
+            });
 
-    // ── Forecast builder ──────────────────────────────────────────────────────
-    const MAX_CHARS = 160;
-    const LOG94 = Math.log(94);
+            // ── Forecast builder ──────────────────────────────────────────────────────
+            const MAX_CHARS = 160;
+            const LOG94 = Math.log(94);
 
-    function builderChars(days, resHours, nModels) {
-      const periodsPerDay = resHours >= 24 ? 1 : 24 / resHours;
-      const nBits = 12 + days * periodsPerDay * nModels * 40;
-      return Math.ceil(nBits * Math.log(2) / LOG94);
-    }
+            function builderChars(days, resHours, nModels) {
+                const periodsPerDay = resHours >= 24 ? 1 : 24 / resHours;
+                const nBits = 12 + days * periodsPerDay * nModels * 40;
+                return Math.ceil((nBits * Math.log(2)) / LOG94);
+            }
 
-    function builderMsg(location, days, resHours, models) {
-      const res = resHours >= 24 ? 'daily' : `${resHours}h`;
-      return `${location} ${days}d ${res} ${models.join(',')}`;
-    }
+            function builderMsg(location, days, resHours, models) {
+                const res = resHours >= 24 ? "daily" : `${resHours}h`;
+                return `${location} ${days}d ${res} ${models.join(",")}`;
+            }
 
-    function updateBuilder() {
-      const location = document.querySelector('input[name="location"]:checked')?.value ?? 'upper';
-      const days     = parseInt(document.getElementById('days-slider').value);
-      const resHours = parseInt(document.querySelector('input[name="resolution"]:checked')?.value ?? '6');
-      const models   = [...document.querySelectorAll('input[name="model"]:checked')].map(el => el.value);
+            function updateBuilder() {
+                const location =
+                    document.querySelector('input[name="location"]:checked')
+                        ?.value ?? "upper";
+                const days = parseInt(
+                    document.getElementById("days-slider").value,
+                );
+                const resHours = parseInt(
+                    document.querySelector('input[name="resolution"]:checked')
+                        ?.value ?? "6",
+                );
+                const models = [
+                    ...document.querySelectorAll('input[name="model"]:checked'),
+                ].map((el) => el.value);
 
-      document.getElementById('days-display').textContent = `${days} day${days > 1 ? 's' : ''}`;
+                document.getElementById("days-display").textContent =
+                    `${days} day${days > 1 ? "s" : ""}`;
 
-      const nChars = models.length > 0 ? builderChars(days, resHours, models.length) : 0;
-      const bar    = document.getElementById('len-bar');
-      const txt    = document.getElementById('len-text');
-      const pct    = Math.min(nChars / MAX_CHARS * 100, 100);
-      const over   = nChars > MAX_CHARS;
-      const cls    = over ? 'len-over' : 'len-ok';
+                const nChars =
+                    models.length > 0
+                        ? builderChars(days, resHours, models.length)
+                        : 0;
+                const bar = document.getElementById("len-bar");
+                const txt = document.getElementById("len-text");
+                const pct = Math.min((nChars / MAX_CHARS) * 100, 100);
+                const over = nChars > MAX_CHARS;
+                const cls = over ? "len-over" : "len-ok";
 
-      bar.style.width      = pct + '%';
-      bar.style.background = over ? '#cc2222' : '#2a8f5a';
-      txt.className        = 'len-text ' + cls;
-      txt.textContent      = models.length === 0
-        ? 'Select at least one model'
-        : over
-          ? `${nChars} chars — exceeds ${MAX_CHARS}, reduce days or resolution`
-          : `${nChars} / ${MAX_CHARS} chars`;
+                bar.style.width = pct + "%";
+                bar.style.background = over ? "#cc2222" : "#2a8f5a";
+                txt.className = "len-text " + cls;
+                txt.textContent =
+                    models.length === 0
+                        ? "Select at least one model"
+                        : over
+                          ? `${nChars} chars — exceeds ${MAX_CHARS}, reduce days or resolution`
+                          : `${nChars} / ${MAX_CHARS} chars`;
 
-      const msg = models.length > 0 ? builderMsg(location, days, resHours, models) : '';
-      document.getElementById('builder-msg').textContent = msg;
-      document.getElementById('builder-copy').disabled = over || models.length === 0;
-    }
+                const msg =
+                    models.length > 0
+                        ? builderMsg(location, days, resHours, models)
+                        : "";
+                document.getElementById("builder-msg").textContent = msg;
+                document.getElementById("builder-copy").disabled =
+                    over || models.length === 0;
+            }
 
-    document.querySelector('.builder').addEventListener('change', updateBuilder);
-    document.getElementById('days-slider').addEventListener('input', updateBuilder);
+            document
+                .querySelector(".builder")
+                .addEventListener("change", updateBuilder);
+            document
+                .getElementById("days-slider")
+                .addEventListener("input", updateBuilder);
 
-    document.getElementById('builder-copy').addEventListener('click', () => {
-      const msg = document.getElementById('builder-msg').textContent;
-      navigator.clipboard.writeText(msg).then(() => {
-        const btn = document.getElementById('builder-copy');
-        btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = 'Copy', 1500);
-      });
-    });
+            document
+                .getElementById("builder-copy")
+                .addEventListener("click", () => {
+                    const msg =
+                        document.getElementById("builder-msg").textContent;
+                    navigator.clipboard.writeText(msg).then(() => {
+                        const btn = document.getElementById("builder-copy");
+                        btn.textContent = "Copied!";
+                        setTimeout(() => (btn.textContent = "Copy"), 1500);
+                    });
+                });
 
-    updateBuilder();
+            updateBuilder();
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    }
-  </script>
-</body>
+            if ("serviceWorker" in navigator) {
+                navigator.serviceWorker.register("sw.js").catch(() => {});
+            }
+        </script>
+    </body>
 </html>
