@@ -2,6 +2,9 @@
   "name": "weather",
   "private": true,
   "workspaces": ["packages/*"],
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
   "scripts": {
     "build": "pnpm --filter @weather/protocol build && pnpm --filter @weather/client build && pnpm --filter @weather/server build",
     "start": "npm run build && node packages/server/dist/index.js",

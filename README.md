@@ -92,13 +92,16 @@ console.log(s, d.days === msg.days && d.periods[0][0].weathercode === 3 ? '✓' 
 EOF
 ```
 
-To test the inbound webhook without a real inReach message:
+### Docker
+
+Build and run the container locally:
 
 ```bash
-curl -X POST http://localhost:8080/inbound \
-  -d 'from=you@example.com' \
-  -d 'text=upper 10d daily ecmwf https://inreachlink.com/YOURTOKEN'
+docker build -t denali-wx .
+docker run --rm -p 8080:8080 denali-wx
 ```
+
+The server starts at `http://localhost:8080`.
 
 ## Deploy
 
