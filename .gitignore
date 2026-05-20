@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 packages/*/dist/
+*.tsbuildinfo
 
 # macOS
 .DS_Store
