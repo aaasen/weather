@@ -71,6 +71,36 @@ input.addEventListener("input", () => {
   }
 });
 
+const fetchBtn = document.getElementById("fetch-btn") as HTMLButtonElement;
+const fetchStatus = document.getElementById("fetch-status") as HTMLElement;
+
+fetchBtn.addEventListener("click", async () => {
+  const msg = (document.getElementById("builder-msg") as HTMLElement).textContent ?? "";
+  if (!msg) return;
+
+  fetchBtn.disabled = true;
+  fetchStatus.textContent = "Fetching…";
+  fetchStatus.className = "fetch-status";
+
+  try {
+    const resp = await fetch("/forecast", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: msg,
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const encoded = await resp.text();
+    input.value = encoded;
+    input.dispatchEvent(new Event("input"));
+    fetchStatus.textContent = "";
+    input.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) {
+    fetchStatus.textContent = String(e);
+    fetchStatus.className = "fetch-status fetch-error";
+    fetchBtn.disabled = false;
+  }
+});
+
 document.querySelector(".builder")?.addEventListener("change", updateBuilder);
 (document.getElementById("days-slider") as HTMLInputElement).addEventListener(
   "input",

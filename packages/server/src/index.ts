@@ -1,11 +1,12 @@
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
-import { health, inbound, testPage } from "./routes.js";
+import { forecast, health, inbound, testPage } from "./routes.js";
 
 const app = new Hono();
 
 app.get("/health", health);
+app.post("/forecast", forecast);
 app.post("/inbound", inbound);
 app.get("/test", testPage);
 app.post("/test", testPage);

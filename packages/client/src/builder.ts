@@ -50,6 +50,7 @@ export function updateBuilder(): void {
 
   const msg = models.length > 0 ? builderMsg(location, days, resHours, models) : "";
   (document.getElementById("builder-msg") as HTMLElement).textContent = msg;
-  (document.getElementById("builder-copy") as HTMLButtonElement).disabled =
-    over || models.length === 0;
+  const disabled = over || models.length === 0;
+  (document.getElementById("builder-copy") as HTMLButtonElement).disabled = disabled;
+  (document.getElementById("fetch-btn") as HTMLButtonElement).disabled = disabled;
 }

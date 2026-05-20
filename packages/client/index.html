@@ -400,19 +400,44 @@
                 color: #333;
                 word-break: break-all;
             }
-            .copy-btn {
+            .copy-btn,
+            .fetch-btn {
                 padding: 4px 10px;
                 font-size: 0.75rem;
                 font-weight: 600;
-                border: 1px solid #d0d0d0;
                 border-radius: 4px;
-                background: #f5f5f5;
                 cursor: pointer;
                 white-space: nowrap;
                 flex-shrink: 0;
             }
-            .copy-btn:active {
-                background: #e0e0e0;
+            .copy-btn {
+                border: 1px solid #2a6bb5;
+                background: #2a6bb5;
+                color: #fff;
+            }
+            .copy-btn:hover:not(:disabled) {
+                background: #1a5aa5;
+                border-color: #1a5aa5;
+            }
+            .fetch-btn {
+                border: 1px solid #d0d0d0;
+                background: #f5f5f5;
+                color: #333;
+            }
+            .fetch-btn:hover:not(:disabled) {
+                background: #e8e8e8;
+            }
+            .copy-btn:disabled,
+            .fetch-btn:disabled {
+                opacity: 0.4;
+                cursor: default;
+            }
+            .fetch-status {
+                font-size: 0.78rem;
+                color: #888;
+            }
+            .fetch-error {
+                color: #c03030;
             }
         </style>
     </head>
@@ -530,8 +555,10 @@
 
                 <div class="builder-output">
                     <code id="builder-msg"></code>
+                    <button class="fetch-btn" id="fetch-btn">Send</button>
                     <button class="copy-btn" id="builder-copy">Copy</button>
                 </div>
+                <span class="fetch-status" id="fetch-status"></span>
             </div>
         </section>
 
@@ -540,9 +567,9 @@
                 <span class="step-num">2</span> Send the message
             </div>
             <p>
-                Send the message above to
+                Send the message to
                 <strong>wx@email.laneaasen.com</strong> from your inReach
-                device. The encoded forecast will be sent back automatically.
+                device and paste the reply into step 3.
             </p>
         </section>
 

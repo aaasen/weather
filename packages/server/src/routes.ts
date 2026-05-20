@@ -4,6 +4,19 @@ import { sendGarminReply } from "./garmin.js";
 
 const REPLY_ADDRESS = "wx@email.laneaasen.com";
 
+export async function forecast(c: Context) {
+  const body = await c.req.text();
+  const params = parseRequest(body.trim());
+  console.log("forecast request:", params);
+  try {
+    const encoded = await fetchForecast(params);
+    return c.text(encoded, 200);
+  } catch (e) {
+    console.error("fetchForecast failed:", e);
+    return c.text("Forecast unavailable", 503);
+  }
+}
+
 export async function inbound(c: Context) {
   const form = await c.req.parseBody();
   const text = String(form["text"] ?? "");
