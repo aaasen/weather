@@ -218,6 +218,125 @@
       color: #aaa;
       margin-top: 10px;
     }
+
+    /* ── Forecast builder ──────────────────────────────────────────────────── */
+    .builder {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .builder-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .builder-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #aaa;
+      min-width: 72px;
+    }
+
+    .builder-opts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .opt-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      border: 1px solid #d0d0d0;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      background: #fff;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .opt-btn:has(input:checked) {
+      border-color: #2a6bb5;
+      background: #eaf1fb;
+      color: #1a4a88;
+    }
+    .opt-btn input { display: none; }
+
+    .days-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #days-slider {
+      width: 130px;
+      accent-color: #2a6bb5;
+    }
+    #days-display {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #333;
+      min-width: 48px;
+    }
+
+    .builder-length {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .len-bar-wrap {
+      flex: 1;
+      max-width: 200px;
+      height: 6px;
+      background: #e8e8e8;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .len-bar { height: 100%; border-radius: 3px; transition: width 0.15s, background 0.15s; }
+    .len-text {
+      font-size: 0.78rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .len-ok   { color: #2a8f5a; }
+    .len-over { color: #cc2222; }
+
+    .builder-output {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #fff;
+      border: 1px solid #d0d0d0;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-top: 4px;
+    }
+    .builder-output code {
+      flex: 1;
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #333;
+      word-break: break-all;
+    }
+    .copy-btn {
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid #d0d0d0;
+      border-radius: 4px;
+      background: #f5f5f5;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .copy-btn:active { background: #e0e0e0; }
   </style>
 </head>
 <body>
@@ -247,6 +366,62 @@
       <tr><td>12h</td><td>5-day, 12-hourly · ECMWF + GFS</td></tr>
     </table>
     <p class="models-note">Altitude levels: 500 hPa ≈ 18k ft &nbsp;·&nbsp; 600 hPa ≈ 14k ft &nbsp;·&nbsp; 700 hPa ≈ 10k ft</p>
+  </details>
+
+  <details class="instructions">
+    <summary>Build a forecast request</summary>
+    <div class="builder">
+
+      <div class="builder-row">
+        <span class="builder-label">Location</span>
+        <div class="builder-opts" id="b-location">
+          <label class="opt-btn"><input type="radio" name="location" value="upper" checked> Upper mountain</label>
+          <label class="opt-btn"><input type="radio" name="location" value="airstrip"> Airstrip</label>
+        </div>
+      </div>
+
+      <div class="builder-row">
+        <span class="builder-label">Days</span>
+        <div class="days-wrap">
+          <input type="range" id="days-slider" min="1" max="10" value="5">
+          <span id="days-display">5 days</span>
+        </div>
+      </div>
+
+      <div class="builder-row">
+        <span class="builder-label">Resolution</span>
+        <div class="builder-opts" id="b-resolution">
+          <label class="opt-btn"><input type="radio" name="resolution" value="24"> Daily</label>
+          <label class="opt-btn"><input type="radio" name="resolution" value="12"> 12h</label>
+          <label class="opt-btn"><input type="radio" name="resolution" value="6" checked> 6h</label>
+          <label class="opt-btn"><input type="radio" name="resolution" value="3"> 3h</label>
+          <label class="opt-btn"><input type="radio" name="resolution" value="1"> 1h</label>
+        </div>
+      </div>
+
+      <div class="builder-row">
+        <span class="builder-label">Models</span>
+        <div class="builder-opts" id="b-models">
+          <label class="opt-btn"><input type="checkbox" name="model" value="ecmwf" checked> ECMWF</label>
+          <label class="opt-btn"><input type="checkbox" name="model" value="gfs" checked> GFS</label>
+          <label class="opt-btn"><input type="checkbox" name="model" value="icon"> ICON</label>
+        </div>
+      </div>
+
+      <div class="builder-row">
+        <span class="builder-label">Forecast Length</span>
+        <div class="builder-length">
+          <div class="len-bar-wrap"><div class="len-bar" id="len-bar"></div></div>
+          <span class="len-text" id="len-text"></span>
+        </div>
+      </div>
+
+      <div class="builder-output">
+        <code id="builder-msg"></code>
+        <button class="copy-btn" id="builder-copy">Copy</button>
+      </div>
+
+    </div>
   </details>
 
   <script>
@@ -607,6 +782,64 @@
         ? render(result)
         : (input.value.trim() ? '<p class="empty">Could not decode forecast.</p>' : '');
     });
+
+    // ── Forecast builder ──────────────────────────────────────────────────────
+    const MAX_CHARS = 160;
+    const LOG94 = Math.log(94);
+
+    function builderChars(days, resHours, nModels) {
+      const periodsPerDay = resHours >= 24 ? 1 : 24 / resHours;
+      const nBits = 12 + days * periodsPerDay * nModels * 40;
+      return Math.ceil(nBits * Math.log(2) / LOG94);
+    }
+
+    function builderMsg(location, days, resHours, models) {
+      const res = resHours >= 24 ? 'daily' : `${resHours}h`;
+      return `${location} ${days}d ${res} ${models.join(',')}`;
+    }
+
+    function updateBuilder() {
+      const location = document.querySelector('input[name="location"]:checked')?.value ?? 'upper';
+      const days     = parseInt(document.getElementById('days-slider').value);
+      const resHours = parseInt(document.querySelector('input[name="resolution"]:checked')?.value ?? '6');
+      const models   = [...document.querySelectorAll('input[name="model"]:checked')].map(el => el.value);
+
+      document.getElementById('days-display').textContent = `${days} day${days > 1 ? 's' : ''}`;
+
+      const nChars = models.length > 0 ? builderChars(days, resHours, models.length) : 0;
+      const bar    = document.getElementById('len-bar');
+      const txt    = document.getElementById('len-text');
+      const pct    = Math.min(nChars / MAX_CHARS * 100, 100);
+      const over   = nChars > MAX_CHARS;
+      const cls    = over ? 'len-over' : 'len-ok';
+
+      bar.style.width      = pct + '%';
+      bar.style.background = over ? '#cc2222' : '#2a8f5a';
+      txt.className        = 'len-text ' + cls;
+      txt.textContent      = models.length === 0
+        ? 'Select at least one model'
+        : over
+          ? `${nChars} chars — exceeds ${MAX_CHARS}, reduce days or resolution`
+          : `${nChars} / ${MAX_CHARS} chars`;
+
+      const msg = models.length > 0 ? builderMsg(location, days, resHours, models) : '';
+      document.getElementById('builder-msg').textContent = msg;
+      document.getElementById('builder-copy').disabled = over || models.length === 0;
+    }
+
+    document.querySelector('.builder').addEventListener('change', updateBuilder);
+    document.getElementById('days-slider').addEventListener('input', updateBuilder);
+
+    document.getElementById('builder-copy').addEventListener('click', () => {
+      const msg = document.getElementById('builder-msg').textContent;
+      navigator.clipboard.writeText(msg).then(() => {
+        const btn = document.getElementById('builder-copy');
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+      });
+    });
+
+    updateBuilder();
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(() => {});
